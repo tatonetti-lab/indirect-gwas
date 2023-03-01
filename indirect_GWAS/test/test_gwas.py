@@ -4,7 +4,7 @@ import pytest
 import pandas as pd
 import xarray as xr
 
-from indirect_GWAS.gwas import gwas_indirect_xarray
+from indirect_GWAS.gwas import gwas_indirect
 from indirect_GWAS.test.utils import ols_regression, build_dataset
 
 
@@ -28,7 +28,7 @@ def build_comparison_df(raw_dataset: xr.Dataset):
         raw_dataset["SE_indirect"],
         raw_dataset["T_STAT_indirect"],
         raw_dataset["P_indirect"],
-    ) = gwas_indirect_xarray(raw_dataset)
+    ) = gwas_indirect(raw_dataset)
 
     comparison_df = raw_dataset[
         [
