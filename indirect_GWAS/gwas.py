@@ -36,20 +36,22 @@ def gwas_indirect(data: xr.Dataset):
     This uses a single xarray so that we can be sure the different arrays are indexed
     and aligned in the same way.
     """
+    # Coefficient estimates
     BETA_indirect = xr.dot(data["B"], data["T"], dims=["feature"])
-    SE_indirect = np.sqrt(
-        (
-            data["T"]
-            .dot(
-                data["P"]
-                - data["B"] * data["B"].rename(feature="feature2") * data["s"],
-                dims=["feature"],
-            )
-            .dot(data["T"].rename(feature="feature2"), dims=["feature2"])
-        )
-        / ((data["N"] - 2) * data["s"])
-    ).transpose("variant", "projection")
+
+    # Standard errors
+    _SE_inner = data["P"] - data["B"] * data["B"].rename(feature="feature2") * data["s"]
+    _SE_numerator = (
+        data["T"]
+        .dot(_SE_inner, dims=["feature"])
+        .dot(data["T"].rename(feature="feature2"), dims=["feature2"])
+    )
+    SE_indirect = np.sqrt(_SE_numerator / ((data["N"] - 2) * data["s"]))
+
+    # t-statistics
     T_STAT_indirect = BETA_indirect / SE_indirect
+
+    # p-values
     P_indirect = 2 * xr.apply_ufunc(
         scipy.stats.t.sf,
         np.abs(T_STAT_indirect),
@@ -57,7 +59,12 @@ def gwas_indirect(data: xr.Dataset):
         output_core_dims=[["variant", "projection"]],
         kwargs={"df": data["N"]},
     )
-    return BETA_indirect, SE_indirect, T_STAT_indirect, P_indirect
+    return (
+        BETA_indirect,
+        SE_indirect.transpose("variant", "projection"),
+        T_STAT_indirect,
+        P_indirect,
+    )
 
 
 def gwas_indirect_ufunc(
