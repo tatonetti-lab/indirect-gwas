@@ -1,25 +1,25 @@
+from numpy.typing import ArrayLike
 import pandas as pd
 import xarray as xr
-from nptyping import DataFrame, Structure, NDArray
 
 
 def build_xarray(
-    projection_coefficients: NDArray | DataFrame,
-    feature_covariance_matrix: NDArray | DataFrame,
-    genotype_dosage_variance: NDArray | pd.Series,
-    feature_GWAS_coefficients: NDArray | DataFrame,
-    n_samples: NDArray | DataFrame,
-) -> xr.Dataset[Structure["T: float, P: float, s: float, B: float, N: int"]]:
+    projection_coefficients: ArrayLike,
+    feature_covariance_matrix: ArrayLike,
+    genotype_dosage_variance: ArrayLike | pd.Series,
+    feature_GWAS_coefficients: ArrayLike,
+    n_samples: ArrayLike,
+) -> xr.Dataset["T: float, P: float, s: float, B: float, N: int"]:
     """
     Build a full dataset xarray from individual arrays
 
     Parameters
     ----------
-    projection_coefficients: NDArray | pd.DataFrame, (feature x projection)
-    feature_covariance_matrix: NDArray | pd.DataFrame, (feature x feature)
-    genotype_dosage_variance: NDArray | pd.Series, (variant)
-    feature_GWAS_coefficients: NDArray | pd.DataFrame, (variant x feature)
-    n_samples: NDArray | pd.DataFrame, (variant x projection)
+    projection_coefficients: ArrayLike, (feature x projection)
+    feature_covariance_matrix: ArrayLike, (feature x feature)
+    genotype_dosage_variance: ArrayLike | pd.Series, (variant)
+    feature_GWAS_coefficients: ArrayLike, (variant x feature)
+    n_samples: ArrayLike, (variant x projection)
 
     Returns
     -------
@@ -42,11 +42,11 @@ def build_xarray(
 
 
 def _check_inputs(
-    projection_coefficients: NDArray | DataFrame,
-    feature_covariance_matrix: NDArray | DataFrame,
-    genotype_dosage_variance: NDArray | pd.Series,
-    feature_GWAS_coefficients: NDArray | DataFrame,
-    n_samples: NDArray | DataFrame,
+    projection_coefficients: ArrayLike,
+    feature_covariance_matrix: ArrayLike,
+    genotype_dosage_variance: ArrayLike | pd.Series,
+    feature_GWAS_coefficients: ArrayLike,
+    n_samples: ArrayLike,
 ) -> tuple[pd.Index, pd.Index, pd.Index]:
     # Check shapes are correct
     n_features, n_projections = projection_coefficients.shape
@@ -64,7 +64,7 @@ def _check_inputs(
         projection_ids = _create_names(n=n_projections, prefix="P")
 
     # Get IDs for variants
-    if isinstance(genotype_dosage_variance, pd.DataFrame):
+    if isinstance(genotype_dosage_variance, pd.DataFrame | pd.Series):
         variant_ids = genotype_dosage_variance.index.tolist()
     else:
         variant_ids = _create_names(n=n_variants, prefix="V")
