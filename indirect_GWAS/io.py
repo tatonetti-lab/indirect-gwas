@@ -9,7 +9,7 @@ def build_xarray(
     genotype_dosage_variance: ArrayLike | pd.Series,
     feature_GWAS_coefficients: ArrayLike,
     n_samples: ArrayLike,
-) -> xr.Dataset["T: float, P: float, s: float, B: float, N: int"]:
+) -> xr.Dataset:
     """
     Build a full dataset xarray from individual arrays
 
@@ -24,6 +24,8 @@ def build_xarray(
     Returns
     -------
     xarray.Dataset
+        T: float, P: float, s: float, B: float, N: int
+        Same order and shapes as inputs.
     """
     feature_index, projection_index, variant_index = _check_inputs(**locals())
 
