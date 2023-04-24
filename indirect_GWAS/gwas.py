@@ -21,6 +21,8 @@ def gwas_indirect(data: xr.Dataset):
             2. P (feature, feature2) - feature covariance matrix
             3. s (variant,) - genotype dosage variance
             4. B (variant, feature) - GWAS coefficient estimates for features
+            # TODO: It would be good if this didn't require these dimensions, would
+            # broadcast if the dimensions are smaller.
             5. N (variant, projection) - sample size for each indirect GWAS
         You can create this array from pandas/numpy using io.build_xarray
 
@@ -29,7 +31,6 @@ def gwas_indirect(data: xr.Dataset):
     tuple[xr.DataArray, xr.DataArray, xr.DataArray, xr.DataArray]
         BETA, SE, T_STAT, P
         GWAS summary statistics, each with dims = (variant, projection)
-
 
     Notes
     -----
@@ -61,7 +62,7 @@ def gwas_indirect(data: xr.Dataset):
     )
     return (
         BETA_indirect,
-        SE_indirect.transpose("variant", "projection"),
+        SE_indirect.transpose("variant", "projection", ...),
         T_STAT_indirect,
         P_indirect,
     )
