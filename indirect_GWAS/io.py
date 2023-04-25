@@ -51,11 +51,10 @@ def _check_inputs(
     n_samples: ArrayLike,
 ) -> tuple[pd.Index, pd.Index, pd.Index]:
     # Check shapes are correct
-    n_features, n_projections = projection_coefficients.shape
-    n_variants = len(genotype_dosage_variance)
-    assert (n_features, n_features) == feature_covariance_matrix.shape
-    assert (n_variants, n_features) == feature_GWAS_coefficients.shape
-    assert (n_variants, n_projections) == n_samples.shape
+    n_features, n_projections = projection_coefficients.shape[:2]
+    n_variants = genotype_dosage_variance.shape[0]
+    assert (n_features, n_features) == feature_covariance_matrix.shape[:2]
+    assert (n_variants, n_features) == feature_GWAS_coefficients.shape[:2]
 
     # Get IDs for features, projections
     if isinstance(projection_coefficients, pd.DataFrame):
