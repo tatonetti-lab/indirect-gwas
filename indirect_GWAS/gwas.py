@@ -55,15 +55,15 @@ def gwas_indirect(data: xr.Dataset):
     P_indirect = 2 * xr.apply_ufunc(
         scipy.stats.t.sf,
         np.abs(T_STAT_indirect),
-        input_core_dims=[["variant", "projection"]],
-        output_core_dims=[["variant", "projection"]],
-        kwargs={"df": data["N"]},
+        data["N"],
+        input_core_dims=[[], []],
+        output_core_dims=[[]],
     )
     return (
-        BETA_indirect,
-        SE_indirect.transpose("variant", "projection", ...),
-        T_STAT_indirect,
-        P_indirect,
+        BETA_indirect.transpose("variant", "projection", ...).rename("beta"),
+        SE_indirect.transpose("variant", "projection", ...).rename("se"),
+        T_STAT_indirect.transpose("variant", "projection", ...).rename("t_stat"),
+        P_indirect.transpose("variant", "projection", ...).rename("p"),
     )
 
 
