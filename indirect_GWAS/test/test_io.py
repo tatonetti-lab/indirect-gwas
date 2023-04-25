@@ -23,7 +23,7 @@ def build_data_numpy(n_features, n_projections, n_variants, one_dim, seed):
         # Feature GWAS coefficients
         np.random.normal(size=(n_variants, n_features)),
         # Sample size
-        np.random.randint(low=100, high=1e6, size=(n_variants, n_projections)),
+        np.random.randint(low=100, high=1e6),
     )
 
 
@@ -55,11 +55,10 @@ def build_data_pandas(n_features, n_projections, n_variants, one_dim, seed):
 def validate_xarray_dataset(dataset):
     assert dataset.dims["feature"] == dataset.dims["feature2"]
     assert np.array_equal(dataset["feature"].values, dataset["feature2"].values)
-    assert dataset["T"].dims == ("feature", "projection")
-    assert dataset["P"].dims == ("feature", "feature2")
-    assert dataset["s"].dims == ("variant",)
-    assert dataset["B"].dims == ("variant", "feature")
-    assert dataset["N"].dims == ("variant", "projection")
+    assert dataset["T"].dims[:2] == ("feature", "projection")
+    assert dataset["P"].dims[:2] == ("feature", "feature2")
+    assert dataset["s"].dims[0] == "variant"
+    assert dataset["B"].dims[:2] == ("variant", "feature")
 
 
 @pytest.mark.parametrize("n_features", [1, 5])

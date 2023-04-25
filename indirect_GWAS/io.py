@@ -1,24 +1,26 @@
+import numpy as np
 from numpy.typing import ArrayLike
 import pandas as pd
 import xarray as xr
+from numbers import Real
 
 
 def build_xarray(
-    projection_coefficients: ArrayLike,
-    feature_covariance_matrix: ArrayLike,
-    genotype_dosage_variance: ArrayLike | pd.Series,
-    feature_GWAS_coefficients: ArrayLike,
-    n_samples: ArrayLike,
+        projection_coef: ArrayLike,
+        feature_cov_matrix: ArrayLike,
+        genotype_dosage_variance: ArrayLike | pd.Series,
+        feature_GWAS_coef: ArrayLike,
+        n_samples: ArrayLike,
 ) -> xr.Dataset:
     """
     Build a full dataset xarray from individual arrays
 
     Parameters
     ----------
-    projection_coefficients: ArrayLike, (feature x projection)
-    feature_covariance_matrix: ArrayLike, (feature x feature)
+    projection_coef: ArrayLike, (feature x projection)
+    feature_cov_matrix: ArrayLike, (feature x feature)
     genotype_dosage_variance: ArrayLike | pd.Series, (variant)
-    feature_GWAS_coefficients: ArrayLike, (variant x feature)
+    feature_GWAS_coef: ArrayLike, (variant x feature)
     n_samples: ArrayLike, (variant x projection)
 
     Returns
@@ -27,39 +29,36 @@ def build_xarray(
         T: float, P: float, s: float, B: float, N: int
         Same order and shapes as inputs.
     """
-    feature_index, projection_index, variant_index = _check_inputs(**locals())
+    feature_idx, projection_idx, variant_idx = _check_inputs(**locals())
 
     data = {
-        "T": _normalize_array(projection_coefficients, feature_index, projection_index),
-        "P": _normalize_array(
-            feature_covariance_matrix, feature_index, feature_index.rename("feature2")
-        ),
-        "s": _normalize_array(genotype_dosage_variance, variant_index, pd.Index(["s"]))[
-            "s"
-        ],
-        "B": _normalize_array(feature_GWAS_coefficients, variant_index, feature_index),
-        "N": _normalize_array(n_samples, variant_index, projection_index),
+        "T": _normalize_array(projection_coef, feature_idx, projection_idx, "T"),
+        "P": _normalize_array(feature_cov_matrix, feature_idx,
+                              feature_idx.rename("feature2"), "P"),
+        "s": _normalize_array(genotype_dosage_variance, variant_idx, None, "s"),
+        "B": _normalize_array(feature_GWAS_coef, variant_idx, feature_idx, "B"),
+        "N": _normalize_array(n_samples, None, None, "N"),
     }
     return xr.Dataset(data)
 
 
 def _check_inputs(
-    projection_coefficients: ArrayLike,
-    feature_covariance_matrix: ArrayLike,
-    genotype_dosage_variance: ArrayLike | pd.Series,
-    feature_GWAS_coefficients: ArrayLike,
-    n_samples: ArrayLike,
+        projection_coef: ArrayLike,
+        feature_cov_matrix: ArrayLike,
+        genotype_dosage_variance: ArrayLike | pd.Series,
+        feature_GWAS_coef: ArrayLike,
+        n_samples: ArrayLike,
 ) -> tuple[pd.Index, pd.Index, pd.Index]:
     # Check shapes are correct
-    n_features, n_projections = projection_coefficients.shape[:2]
+    n_features, n_projections = projection_coef.shape[:2]
     n_variants = genotype_dosage_variance.shape[0]
-    assert (n_features, n_features) == feature_covariance_matrix.shape[:2]
-    assert (n_variants, n_features) == feature_GWAS_coefficients.shape[:2]
+    assert (n_features, n_features) == feature_cov_matrix.shape[:2]
+    assert (n_variants, n_features) == feature_GWAS_coef.shape[:2]
 
     # Get IDs for features, projections
-    if isinstance(projection_coefficients, pd.DataFrame):
-        feature_ids = projection_coefficients.index.tolist()
-        projection_ids = projection_coefficients.columns.tolist()
+    if isinstance(projection_coef, pd.DataFrame):
+        feature_ids = projection_coef.index.tolist()
+        projection_ids = projection_coef.columns.tolist()
     else:
         feature_ids = _create_names(n=n_features, prefix="F")
         projection_ids = _create_names(n=n_projections, prefix="P")
@@ -71,12 +70,12 @@ def _check_inputs(
         variant_ids = _create_names(n=n_variants, prefix="V")
 
     # Check that index/column ids are shared where appropriate
-    if isinstance(feature_covariance_matrix, pd.DataFrame):
-        assert set(feature_ids) == set(feature_covariance_matrix.index)
-        assert set(feature_ids) == set(feature_covariance_matrix.columns)
-    if isinstance(feature_GWAS_coefficients, pd.DataFrame):
-        assert set(variant_ids) == set(feature_GWAS_coefficients.index)
-        assert set(feature_ids) == set(feature_GWAS_coefficients.columns)
+    if isinstance(feature_cov_matrix, pd.DataFrame):
+        assert set(feature_ids) == set(feature_cov_matrix.index)
+        assert set(feature_ids) == set(feature_cov_matrix.columns)
+    if isinstance(feature_GWAS_coef, pd.DataFrame):
+        assert set(variant_ids) == set(feature_GWAS_coef.index)
+        assert set(feature_ids) == set(feature_GWAS_coef.columns)
     if isinstance(n_samples, pd.DataFrame):
         assert set(variant_ids) == set(n_samples.index)
         assert set(projection_ids) == set(n_samples.columns)
@@ -88,15 +87,84 @@ def _check_inputs(
     return feature_index, projection_index, variant_index
 
 
-def _normalize_array(array, row_index: pd.Index, col_index: pd.Index) -> pd.DataFrame:
-    if isinstance(array, pd.DataFrame):
-        return (
-            array.rename_axis(row_index.name, axis="index")
-            .rename_axis(col_index.name, axis="columns")
-            .loc[row_index, col_index]
-        )
+def _normalize_array(
+        array: np.ndarray | pd.Series | pd.DataFrame | xr.DataArray,
+        row_index: pd.Index | None = None,
+        col_index: pd.Index | None = None,
+        name: str | None = None,
+) -> xr.DataArray:
+    if row_index is not None:
+        coords = {row_index.name: row_index}
+        if col_index is not None:
+            coords[col_index.name] = col_index
     else:
-        return pd.DataFrame(array, index=row_index, columns=col_index)
+        coords = None
+
+    try:
+        assert isinstance(array,
+                          np.ndarray | pd.Series | pd.DataFrame | xr.DataArray | Real)
+    except AssertionError:
+        raise AssertionError(array, type(array))
+
+    if isinstance(array, Real):
+        array = np.array(array)
+
+    if isinstance(array, np.ndarray):
+        # Doesn't support more than 2 dimensional arrays since there won't be any index
+        assert name is not None
+
+        squeezed = array.squeeze()
+
+        if squeezed.ndim == 0:
+            if row_index is None:
+                # Only case where we don't need a row_index, at least
+                return xr.DataArray(squeezed, name=name)
+            elif col_index is None:
+                return xr.DataArray(array.ravel(), coords=coords, name=name)
+            else:
+                return xr.DataArray(array, coords=coords, name=name)
+
+        assert row_index is not None
+
+        if squeezed.ndim == 1:
+            if col_index is None:
+                return xr.DataArray(array.ravel(), coords=coords, name=name)
+            else:
+                return xr.DataArray(array, coords=coords, name=name)
+
+        assert col_index is not None
+        assert squeezed.ndim >= 2
+
+        return xr.DataArray(squeezed, coords=coords, name=name)
+
+    elif isinstance(array, pd.Series):
+        if row_index is not None:
+            array = array.rename_axis(row_index.name, axis="index").loc[row_index]
+
+        assert col_index is None
+        return xr.DataArray(array, name=name)
+
+    elif isinstance(array, pd.DataFrame):
+        if row_index is not None:
+            array = array.rename_axis(row_index.name, axis="index").loc[row_index]
+        if col_index is not None:
+            array = array.rename_axis(col_index.name, axis="columns").loc[:, col_index]
+
+        return xr.DataArray(array, name=name)
+
+    elif isinstance(array, xr.DataArray):
+        if array.name != name:
+            array = array.rename(name)
+
+        if row_index is not None:
+            array = array.loc[row_index]
+
+        if col_index is not None:
+            array = array.loc[:, col_index]
+
+        return array
+    else:
+        raise ValueError(f"Unknown type of array '{type(array)}'")
 
 
 def _create_names(n, prefix):

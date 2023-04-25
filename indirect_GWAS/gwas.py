@@ -10,21 +10,20 @@ def gwas_indirect(data: xr.Dataset):
 
     Parameters
     ----------
-    dataset : xarray.Dataset
+    data : xarray.Dataset
         This should have the following dimensions:
             1. "feature"
             2. "variant"
             3. "projection"
             4. "feature2"
         This should have the following data variables (dims):
-            1. T (feature, projection) - projection coefficients
-            2. P (feature, feature2) - feature covariance matrix
-            3. s (variant,) - genotype dosage variance
-            4. B (variant, feature) - GWAS coefficient estimates for features
-            # TODO: It would be good if this didn't require these dimensions, would
-            # broadcast if the dimensions are smaller.
-            5. N (variant, projection) - sample size for each indirect GWAS
-        You can create this array from pandas/numpy using io.build_xarray
+            1. T (feature, projection, ...) - projection coefficients
+            2. P (feature, feature2, ...) - feature covariance matrix
+            3. s (variant, ...) - genotype dosage variance
+            4. B (variant, feature, ...) - GWAS coefficient estimates for features
+            5. N (...) - sample size for each indirect GWAS
+
+        You can create this array from pandas/numpy/xarray using io.build_xarray
 
     Returns
     -------
