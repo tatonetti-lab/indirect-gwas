@@ -59,6 +59,9 @@ def _check_inputs(
     if isinstance(projection_coef, pd.DataFrame):
         feature_ids = projection_coef.index.tolist()
         projection_ids = projection_coef.columns.tolist()
+    elif isinstance(projection_coef, xr.DataArray):
+        feature_ids = projection_coef.indexes[projection_coef.dims[0]]
+        projection_ids = projection_coef.indexes[projection_coef.dims[1]]
     else:
         feature_ids = _create_names(n=n_features, prefix="F")
         projection_ids = _create_names(n=n_projections, prefix="P")
@@ -66,6 +69,8 @@ def _check_inputs(
     # Get IDs for variants
     if isinstance(genotype_dosage_variance, pd.DataFrame | pd.Series):
         variant_ids = genotype_dosage_variance.index.tolist()
+    elif isinstance(genotype_dosage_variance, xr.DataArray):
+        variant_ids = genotype_dosage_variance.indexes[genotype_dosage_variance.dims[0]]
     else:
         variant_ids = _create_names(n=n_variants, prefix="V")
 
@@ -73,12 +78,16 @@ def _check_inputs(
     if isinstance(feature_cov_matrix, pd.DataFrame):
         assert set(feature_ids) == set(feature_cov_matrix.index)
         assert set(feature_ids) == set(feature_cov_matrix.columns)
+    elif isinstance(feature_cov_matrix, xr.DataArray):
+        assert set(feature_ids) == set(feature_cov_matrix.indexes[feature_cov_matrix.dims[0]])
+        assert set(feature_ids) == set(feature_cov_matrix.indexes[feature_cov_matrix.dims[1]])
+
     if isinstance(feature_GWAS_coef, pd.DataFrame):
         assert set(variant_ids) == set(feature_GWAS_coef.index)
         assert set(feature_ids) == set(feature_GWAS_coef.columns)
-    if isinstance(n_samples, pd.DataFrame):
-        assert set(variant_ids) == set(n_samples.index)
-        assert set(projection_ids) == set(n_samples.columns)
+    elif isinstance(feature_GWAS_coef, xr.DataArray):
+        assert set(variant_ids) == set(feature_GWAS_coef.indexes[feature_GWAS_coef.dims[0]])
+        assert set(feature_ids) == set(feature_GWAS_coef.indexes[feature_GWAS_coef.dims[1]])
 
     # Create pandas indexes for each dimension
     feature_index = pd.Index(feature_ids, name="feature")
