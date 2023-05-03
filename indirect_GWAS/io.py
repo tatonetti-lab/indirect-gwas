@@ -1,180 +1,487 @@
 import numpy as np
-from numpy.typing import ArrayLike
 import pandas as pd
-import xarray as xr
-from numbers import Real
+from xarray import Dataset
 
 
-def build_xarray(
-        projection_coef: ArrayLike,
-        feature_cov_matrix: ArrayLike,
-        genotype_dosage_variance: ArrayLike | pd.Series,
-        feature_GWAS_coef: ArrayLike,
-        n_samples: ArrayLike,
-) -> xr.Dataset:
+class IndirectGWASDataset(Dataset):
+    __slots__ = ("T", "P", "s", "B", "df")
+
+
+def compute_phenotypic_partial_variance(
+    feature_phenotypes: pd.DataFrame,
+    covariates: pd.DataFrame,
+    add_intercept: bool = True,
+):
     """
-    Build a full dataset xarray from individual arrays
+    Compute the partial variance of phenotypes not explained by covariates using
+     individual-level data.
+
+    This is the covariance of the residuals that arise when covariates are used to
+    predict each feature phenotype. Only run this if needed. Runtime can be minutes or
+    more.
 
     Parameters
     ----------
-    projection_coef: ArrayLike, (feature x projection)
-    feature_cov_matrix: ArrayLike, (feature x feature)
-    genotype_dosage_variance: ArrayLike | pd.Series, (variant)
-    feature_GWAS_coef: ArrayLike, (variant x feature)
-    n_samples: ArrayLike, (variant x projection)
+    feature_phenotypes : pd.DataFrame
+        samples x features
+    covariates : pd.DataFrame
+        samples x covariates
+    add_intercept : bool, optional
+        Whether to add an intercept/constant term to the covariates, by default True
 
     Returns
     -------
-    xarray.Dataset
-        T: float, P: float, s: float, B: float, N: int
-        Same order and shapes as inputs.
+    pd.DataFrame
+        Covariance among feature phenotypes after adjusting for covariates
     """
-    feature_idx, projection_idx, variant_idx = _check_inputs(**locals())
+    # Add an intercept if there is not one
+    if add_intercept:
+        covariates = covariates.copy()
+        covariates["const"] = 1
 
-    data = {
-        "T": _normalize_array(projection_coef, feature_idx, projection_idx, "T"),
-        "P": _normalize_array(feature_cov_matrix, feature_idx,
-                              feature_idx.rename("feature2"), "P"),
-        "s": _normalize_array(genotype_dosage_variance, variant_idx, None, "s"),
-        "B": _normalize_array(feature_GWAS_coef, variant_idx, feature_idx, "B"),
-        "N": _normalize_array(n_samples, None, None, "N"),
-    }
-    return xr.Dataset(data)
+    # Residualize phenotypes against covariates
+    residualization_coef = np.linalg.lstsq(covariates, feature_phenotypes, None)[0]
+    predictions = (covariates @ residualization_coef).set_axis(
+        feature_phenotypes.columns, axis=1
+    )
+    residualized_phenotypes = feature_phenotypes - predictions
+    phenotype_partial_covariance = np.cov(residualized_phenotypes, rowvar=False, ddof=1)
+    if phenotype_partial_covariance.ndim < 2:
+        phenotype_partial_covariance = phenotype_partial_covariance.reshape(1, -1)
+
+    # Convert to pandas.DataFrame with proper index and columns
+    phenotype_partial_covariance = pd.DataFrame(
+        phenotype_partial_covariance,
+        index=feature_phenotypes.columns,
+        columns=feature_phenotypes.columns,
+    )
+    return phenotype_partial_covariance
 
 
-def _check_inputs(
-        projection_coef: ArrayLike,
-        feature_cov_matrix: ArrayLike,
-        genotype_dosage_variance: ArrayLike | pd.Series,
-        feature_GWAS_coef: ArrayLike,
-        n_samples: ArrayLike,
-) -> tuple[pd.Index, pd.Index, pd.Index]:
-    # Check shapes are correct
-    n_features, n_projections = projection_coef.shape[:2]
-    n_variants = genotype_dosage_variance.shape[0]
-    assert (n_features, n_features) == feature_cov_matrix.shape[:2]
-    assert (n_variants, n_features) == feature_GWAS_coef.shape[:2]
+def compute_genotype_partial_variance(
+    feature_partial_covariance: pd.DataFrame,
+    feature_gwas_coefficients: pd.DataFrame,
+    feature_gwas_standard_error: pd.DataFrame,
+    feature_gwas_sample_size: int | pd.DataFrame,
+    n_covar: int | pd.DataFrame,
+) -> pd.Series:
+    """
+    Compute the genotype partial variance for each variant.
 
-    # Get IDs for features, projections
-    if isinstance(projection_coef, pd.DataFrame):
-        feature_ids = projection_coef.index.tolist()
-        projection_ids = projection_coef.columns.tolist()
-    elif isinstance(projection_coef, xr.DataArray):
-        feature_ids = projection_coef.indexes[projection_coef.dims[0]]
-        projection_ids = projection_coef.indexes[projection_coef.dims[1]]
+    Consider the GWAS as p ~ g + covar. Let `n` be the number of samples, let `n_covar`
+     be the number of covariates, let `beta_g` be the estimated coefficient of g, let
+     `SE(beta_g)` be the coefficient's standard error, and let `Var_p(p)` be the partial
+     phenotypic variance. Then the partial genotype variance is computed as follows:
+
+    Var_p(g) = Var_p(p) / (SE(beta_g)^2 * (n - n_covar - 1) + beta_g^2)
+
+    Note that at present this doesn't allow projections to have different sample sizes,
+    which would result in slightly different genotype partial variances.
+
+    This function assumes that all inputs have consistent indexes.
+    """
+    # Compute the variants x features matrix of genotype partial variance
+    feature_genotype_partial_variance = np.diag(feature_partial_covariance) / (
+        feature_gwas_standard_error**2 * (feature_gwas_sample_size - n_covar - 1)
+        + feature_gwas_coefficients**2
+    )
+
+    # Take the mean of this array over the features to get a per-variant value
+    genotype_partial_variance = np.mean(feature_genotype_partial_variance, axis=1)
+
+    # Convert to pandas.Series with proper index and name
+    return pd.Series(
+        genotype_partial_variance,
+        index=feature_gwas_coefficients.index,
+        name="s",
+    )
+
+
+def _check_projection_coefficients(
+    projection_coefficients: pd.DataFrame,
+) -> pd.DataFrame:
+    """Ensure that projection coefficients are consistent"""
+    # Check that input is a DataFrame
+    assert isinstance(projection_coefficients, pd.DataFrame)
+
+    # Ensure no duplicates in indexes or columns (enumerated for debugging clarity)
+    assert not projection_coefficients.index.has_duplicates
+    assert not projection_coefficients.columns.has_duplicates
+
+    # Check that the indices are consistent (same values)
+    projection_index = projection_coefficients.columns.sort_values().rename(
+        "projection"
+    )
+    feature_index = projection_coefficients.index.sort_values().rename("feature")
+
+    # Normalize DataFrame (ensure consistent index/cols)
+    projection_coefficients = projection_coefficients.loc[
+        feature_index, projection_index
+    ]
+
+    return projection_coefficients
+
+
+def _check_individual_data(
+    feature_phenotypes: pd.DataFrame, covariates: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Ensure that individual data is consistent, assume index values are sample ids"""
+    # Check that all inputs are DataFrames
+    assert isinstance(feature_phenotypes, pd.DataFrame)
+    assert isinstance(covariates, pd.DataFrame)
+
+    # Ensure no duplicates in indexes or columns (enumerated for debugging clarity)
+    assert not feature_phenotypes.index.has_duplicates
+    assert not feature_phenotypes.columns.has_duplicates
+    assert not covariates.index.has_duplicates
+    assert not covariates.columns.has_duplicates
+
+    # Check that the indices are consistent (same sample ids)
+    feature_index = feature_phenotypes.index.sort_values()
+    covariate_index = covariates.index.sort_values()
+    assert feature_index.equals(covariate_index)
+
+    # Normalize DataFrames (ensure consistent index/cols)
+    feature_phenotypes = feature_phenotypes.loc[feature_index]
+    covariates = covariates.loc[feature_index]
+
+    return feature_phenotypes, covariates
+
+
+def _check_gwas_sumstats(*arrays: pd.DataFrame) -> list[pd.DataFrame]:
+    """Ensure that coefficients, standard errors, and sample sizes are consistent"""
+    # Check that all inputs are DataFrames
+    for array in arrays:
+        assert isinstance(array, pd.DataFrame)
+
+    # Check that all inputs have the same shape
+    assert len(set(array.shape for array in arrays)) == 1
+
+    # Ensure no duplicates in indexes or columns
+    for array in arrays:
+        assert not array.index.has_duplicates
+        assert not array.columns.has_duplicates
+
+    # Check that the arbitrary number of dataframes have identical index and columns
+    row_index = arrays[0].index.sort_values().rename("variant")
+    col_index = arrays[0].columns.sort_values().rename("feature")
+
+    for array in arrays:
+        assert array.index.sort_values().equals(row_index)
+        assert array.columns.sort_values().equals(col_index)
+
+    # Normalize each DataFrame (ensure consistent index/cols)
+    arrays = [array.loc[row_index, col_index] for array in arrays]
+
+    return arrays
+
+
+def _check_feature_partial_covariance(
+    feature_partial_covariance: pd.DataFrame,
+) -> pd.DataFrame:
+    """Ensure that feature partial covariance is consistent"""
+    # Check that input is a DataFrame
+    assert isinstance(feature_partial_covariance, pd.DataFrame)
+
+    # Ensure no duplicates in indexes or columns (enumerated for debugging clarity)
+    assert not feature_partial_covariance.index.has_duplicates
+    assert not feature_partial_covariance.columns.has_duplicates
+
+    # Check that the indices are consistent (same values)
+    feature_index = feature_partial_covariance.columns.sort_values().rename("feature")
+    assert feature_index.equals(feature_partial_covariance.index.sort_values())
+
+    # Normalize DataFrame (ensure consistent index/cols)
+    feature_partial_covariance = feature_partial_covariance.loc[
+        feature_index, feature_index.rename("feature2")
+    ]
+
+    return feature_partial_covariance
+
+
+def _check_genotype_partial_variance(genotype_partial_variance: pd.Series) -> pd.Series:
+    """Ensure that genotype partial variance is consistent"""
+    # Check that input is a Series
+    assert isinstance(genotype_partial_variance, pd.Series)
+
+    # Ensure no duplicates in index (enumerated for debugging clarity)
+    assert not genotype_partial_variance.index.has_duplicates
+
+    # Format the index
+    variant_index = genotype_partial_variance.index.sort_values().rename("variant")
+
+    return genotype_partial_variance.loc[variant_index].rename("s")
+
+
+def _check_projection_degrees_of_freedom(
+    projection_degrees_of_freedom: int | pd.Series,
+) -> int | pd.Series:
+    """Ensure that projection degrees of freedom is consistent.
+    Either an integer or a pd.Series across variants."""
+    # Check that input is a Series or int
+    assert isinstance(projection_degrees_of_freedom, pd.Series | int)
+
+    # Ensure no duplicates in index (enumerated for debugging clarity)
+    if isinstance(projection_degrees_of_freedom, pd.Series):
+        assert not projection_degrees_of_freedom.index.has_duplicates
+
+        # Format the index
+        variant_index = projection_degrees_of_freedom.index.sort_values().rename("variant")
+        return projection_degrees_of_freedom.loc[variant_index].rename("N")
     else:
-        feature_ids = _create_names(n=n_features, prefix="F")
-        projection_ids = _create_names(n=n_projections, prefix="P")
+        assert projection_degrees_of_freedom > 0
+        return projection_degrees_of_freedom
 
-    # Get IDs for variants
-    if isinstance(genotype_dosage_variance, pd.DataFrame | pd.Series):
-        variant_ids = genotype_dosage_variance.index.tolist()
-    elif isinstance(genotype_dosage_variance, xr.DataArray):
-        variant_ids = genotype_dosage_variance.indexes[genotype_dosage_variance.dims[0]]
+
+def from_individual_data(
+    projection_coefficients: pd.DataFrame,
+    feature_phenotypes: pd.DataFrame,
+    covariates: pd.DataFrame,
+    feature_gwas_coefficients: pd.DataFrame,
+    feature_gwas_standard_error: pd.DataFrame,
+    feature_gwas_sample_size: int | pd.DataFrame,
+    projection_sample_size: int | pd.Series | None = None,
+    add_intercept: bool = True,
+) -> IndirectGWASDataset:
+    """
+    Build an IndirectGWASDataset from individual-level data.
+
+    Computes the phenotypic partial covariance matrix and the genotype partial variance.
+    If you just finished running a linear regression GWAS, this is likely the simplest
+    method to use.
+
+    Note: This method will only work for linear regression GWAS. If you have a linear
+    mixed model or any covariates that aren't provided, you'll need to compute the
+    phenotypic partial covariance matrix first.
+
+    This function is essentially just a wrapper around
+    `compute_phenotypic_partial_variance` and `from_summary_statistics`.
+
+    Parameters
+    ----------
+    projection_coefficients : pd.DataFrame
+        features x projections
+    feature_phenotypes : pd.DataFrame
+        samples x features
+    covariates : pd.DataFrame
+        samples x covariates
+    feature_gwas_coefficients : pd.DataFrame
+        variants x features
+    feature_gwas_standard_error : pd.DataFrame
+        variants x features
+    feature_gwas_sample_size : int | pd.DataFrame
+        The number of samples used in each feature GWAS regression. Either the same
+        value for every variant x feature or a DataFrame across (variants x features).
+    projection_sample_size : int | pd.Series | None, optional
+        The number of samples that would be included in each indirect GWAS regression.
+        Either the same value for all variants or a Series across variants. Default
+        (None) will use the minimum sample size across all variants from the feature
+        GWAS.
+    add_intercept : bool, optional
+        Whether to add a constant intercept term to the covariates, by default True
+
+    Returns
+    -------
+    IndirectGWASDataset
+    """
+    # Check projection coefficients
+    projection_coefficients = _check_projection_coefficients(projection_coefficients)
+
+    # Check individual data
+    feature_phenotypes, covariates = _check_individual_data(
+        feature_phenotypes, covariates
+    )
+
+    # Check GWAS summary statistics
+    (
+        feature_gwas_coefficients,
+        feature_gwas_standard_error,
+    ) = _check_gwas_sumstats(
+        feature_gwas_coefficients,
+        feature_gwas_standard_error,
+    )
+    if isinstance(feature_gwas_sample_size, pd.DataFrame):
+        [feature_gwas_sample_size] = _check_gwas_sumstats(feature_gwas_sample_size)
+
+    # Compute the phenotypic partial covariance matrix
+    feature_partial_covariance = compute_phenotypic_partial_variance(
+        feature_phenotypes,
+        covariates,
+        add_intercept=add_intercept,
+    )
+    n_covar = covariates.shape[1] if not add_intercept else covariates.shape[1] + 1
+    return from_summary_statistics(
+        projection_coefficients,
+        feature_partial_covariance,
+        feature_gwas_coefficients,
+        feature_gwas_standard_error,
+        feature_gwas_sample_size,
+        n_covar,
+        projection_sample_size,
+    )
+
+
+def from_summary_statistics(
+    projection_coefficients: pd.DataFrame,
+    feature_partial_covariance: pd.DataFrame,
+    feature_gwas_coefficients: pd.DataFrame,
+    feature_gwas_standard_error: pd.DataFrame,
+    feature_gwas_sample_size: int | pd.DataFrame,
+    n_covar: int | pd.DataFrame,
+    projection_sample_size: int | pd.Series | None = None,
+) -> IndirectGWASDataset:
+    """
+    Build an IndirectGWASDataset from summary statistics.
+
+    Computes the genotype partial variance using the phenotypic partial covariance
+    matrix and the feature GWAS summary statistics.
+
+    This function is essentially just a wrapper around
+    `compute_genotype_partial_variance` and `from_final_data`.
+
+    Parameters
+    ----------
+    projection_coefficients : pd.DataFrame
+        features x projections
+    feature_partial_covariance : pd.DataFrame
+        features x features
+    feature_gwas_coefficients : pd.DataFrame
+        variants x features
+    feature_gwas_standard_error : pd.DataFrame
+        variants x features
+    feature_gwas_sample_size : int | pd.DataFrame
+        The number of samples used in each feature GWAS regression. Either the same
+        value for every variant x feature or a DataFrame across (variants x features).
+    n_covar : int | pd.DataFrame
+        Number of covariates used in each feature GWAS. Either the same value for all
+        feature GWAS or a DataFrame across (variants x features).
+    projection_sample_size : int | pd.Series | None, optional
+        The number of samples that would be included in each indirect GWAS regression.
+        Either the same value for all variants or a Series across variants. Default
+        (None) will use the minimum sample size across all variants from the feature
+        GWAS.
+
+    Returns
+    -------
+    IndirectGWASDataset
+    """
+    # Check projection coefficients
+    projection_coefficients = _check_projection_coefficients(projection_coefficients)
+
+    # Check phenotypic partial covariance matrix
+    feature_partial_covariance = _check_feature_partial_covariance(
+        feature_partial_covariance
+    )
+
+    # Check GWAS summary statistics
+    (
+        feature_gwas_coefficients,
+        feature_gwas_standard_error,
+    ) = _check_gwas_sumstats(
+        feature_gwas_coefficients,
+        feature_gwas_standard_error,
+    )
+    if isinstance(feature_gwas_sample_size, pd.DataFrame):
+        [feature_gwas_sample_size] = _check_gwas_sumstats(feature_gwas_sample_size)
+
+    # Compute the genotype partial variances
+    genotype_partial_variance = compute_genotype_partial_variance(
+        feature_partial_covariance=feature_partial_covariance,
+        feature_gwas_coefficients=feature_gwas_coefficients,
+        feature_gwas_standard_error=feature_gwas_standard_error,
+        feature_gwas_sample_size=feature_gwas_sample_size,
+        n_covar=n_covar,
+    )
+
+    # Set the projection sample size to min of feature GWAS sample sizes if not provided
+    if projection_sample_size is None and isinstance(feature_gwas_sample_size, pd.DataFrame):
+        projection_sample_size = feature_gwas_sample_size.min(axis=1)
     else:
-        variant_ids = _create_names(n=n_variants, prefix="V")
+        projection_sample_size = feature_gwas_sample_size
 
-    # Check that index/column ids are shared where appropriate
-    if isinstance(feature_cov_matrix, pd.DataFrame):
-        assert set(feature_ids) == set(feature_cov_matrix.index)
-        assert set(feature_ids) == set(feature_cov_matrix.columns)
-    elif isinstance(feature_cov_matrix, xr.DataArray):
-        assert set(feature_ids) == set(feature_cov_matrix.indexes[feature_cov_matrix.dims[0]])
-        assert set(feature_ids) == set(feature_cov_matrix.indexes[feature_cov_matrix.dims[1]])
-
-    if isinstance(feature_GWAS_coef, pd.DataFrame):
-        assert set(variant_ids) == set(feature_GWAS_coef.index)
-        assert set(feature_ids) == set(feature_GWAS_coef.columns)
-    elif isinstance(feature_GWAS_coef, xr.DataArray):
-        assert set(variant_ids) == set(feature_GWAS_coef.indexes[feature_GWAS_coef.dims[0]])
-        assert set(feature_ids) == set(feature_GWAS_coef.indexes[feature_GWAS_coef.dims[1]])
-
-    # Create pandas indexes for each dimension
-    feature_index = pd.Index(feature_ids, name="feature")
-    projection_index = pd.Index(projection_ids, name="projection")
-    variant_index = pd.Index(variant_ids, name="variant")
-    return feature_index, projection_index, variant_index
+    # Build the dataset
+    return from_final_data(
+        projection_coefficients,
+        feature_partial_covariance,
+        feature_gwas_coefficients,
+        genotype_partial_variance,
+        projection_sample_size - n_covar - 1,
+    )
 
 
-def _normalize_array(
-        array: np.ndarray | pd.Series | pd.DataFrame | xr.DataArray,
-        row_index: pd.Index | None = None,
-        col_index: pd.Index | None = None,
-        name: str | None = None,
-) -> xr.DataArray:
-    if row_index is not None:
-        coords = {row_index.name: row_index}
-        if col_index is not None:
-            coords[col_index.name] = col_index
-    else:
-        coords = None
+def from_final_data(
+    projection_coefficients: pd.DataFrame,
+    feature_partial_covariance: pd.DataFrame,
+    feature_gwas_coefficients: pd.DataFrame,
+    genotype_partial_variance: pd.Series,
+    projection_degrees_of_freedom: int | pd.Series,
+) -> IndirectGWASDataset:
+    """
+    Build an IndirectGWASDataset from the final data.
 
-    try:
-        assert isinstance(array,
-                          np.ndarray | pd.Series | pd.DataFrame | xr.DataArray | Real)
-    except AssertionError:
-        raise AssertionError(array, type(array))
+    Use this function only if you already have the phenotypic partial covariance matrix
+    and the genotype partial variance for every variant.
 
-    if isinstance(array, Real):
-        array = np.array(array)
+    Parameters
+    ----------
+    projection_coefficients : pd.DataFrame
+        features x projections
+    feature_partial_covariance : pd.DataFrame
+        features x features
+    feature_gwas_coefficients : pd.DataFrame
+        variants x features
+    genotype_partial_variance : pd.Series
+        variants
+    projection_degrees_of_freedom : int | pd.Series
+        The number of degrees of freedom in each indirect GWAS regression. Either the
+        same value for all variants and indirect regressions (int) or a variant-specific
+        value (pd.Series). Currently does not support projection-specific values.
 
-    if isinstance(array, np.ndarray):
-        # Doesn't support more than 2 dimensional arrays since there won't be any index
-        assert name is not None
+    Returns
+    -------
+    IndirectGWASDataset
+    """
+    # Check inputs
+    # Check projection coefficients
+    projection_coefficients = _check_projection_coefficients(projection_coefficients)
 
-        squeezed = array.squeeze()
+    # Check phenotypic partial covariance matrix
+    feature_partial_covariance = _check_feature_partial_covariance(
+        feature_partial_covariance
+    )
 
-        if squeezed.ndim == 0:
-            if row_index is None:
-                # Only case where we don't need a row_index, at least
-                return xr.DataArray(squeezed, name=name)
-            elif col_index is None:
-                return xr.DataArray(array.ravel(), coords=coords, name=name)
-            else:
-                return xr.DataArray(array, coords=coords, name=name)
+    # Check GWAS summary statistics
+    [feature_gwas_coefficients] = _check_gwas_sumstats(feature_gwas_coefficients)
 
-        assert row_index is not None
+    # Check genotype partial variance
+    genotype_partial_variance = _check_genotype_partial_variance(
+        genotype_partial_variance
+    )
 
-        if squeezed.ndim == 1:
-            if col_index is None:
-                return xr.DataArray(array.ravel(), coords=coords, name=name)
-            else:
-                return xr.DataArray(array, coords=coords, name=name)
+    # Check projection degrees of freedom
+    projection_degrees_of_freedom = _check_projection_degrees_of_freedom(
+        projection_degrees_of_freedom
+    )
 
-        assert col_index is not None
-        assert squeezed.ndim >= 2
+    # Check that indexes are consistent with one another
+    assert (
+        projection_coefficients.index.equals(feature_partial_covariance.index)
+        and feature_partial_covariance.index.equals(feature_gwas_coefficients.columns)
+        and feature_gwas_coefficients.index.equals(genotype_partial_variance.index)
+    ), "Indexes are not consistent with one another"
 
-        return xr.DataArray(squeezed, coords=coords, name=name)
+    if isinstance(projection_degrees_of_freedom, pd.Series):
+        assert projection_degrees_of_freedom.index.equals(
+            genotype_partial_variance.index
+        ), "Indexes are not consistent with one another"
 
-    elif isinstance(array, pd.Series):
-        if row_index is not None:
-            array = array.rename_axis(row_index.name, axis="index").loc[row_index]
-
-        assert col_index is None
-        return xr.DataArray(array, name=name)
-
-    elif isinstance(array, pd.DataFrame):
-        if row_index is not None:
-            array = array.rename_axis(row_index.name, axis="index").loc[row_index]
-        if col_index is not None:
-            array = array.rename_axis(col_index.name, axis="columns").loc[:, col_index]
-
-        return xr.DataArray(array, name=name)
-
-    elif isinstance(array, xr.DataArray):
-        if array.name != name:
-            array = array.rename(name)
-
-        if row_index is not None:
-            array = array.loc[row_index]
-
-        if col_index is not None:
-            array = array.loc[:, col_index]
-
-        return array
-    else:
-        raise ValueError(f"Unknown type of array '{type(array)}'")
-
-
-def _create_names(n, prefix):
-    return [f"{prefix}{i}" for i in range(1, n + 1)]
+    # Build the dataset
+    return IndirectGWASDataset(
+        {
+            "T": projection_coefficients,
+            "P": feature_partial_covariance,
+            "s": genotype_partial_variance,
+            "B": feature_gwas_coefficients,
+            "df": projection_degrees_of_freedom,
+        }
+    )

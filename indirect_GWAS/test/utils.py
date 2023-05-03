@@ -10,7 +10,7 @@ def ols_regression(y, X):
     B = reg.params[[1]]
     SE = reg.bse[[1]]
     T = B / SE
-    P = 2 * scipy.stats.t.sf(np.abs(T), df=X.shape[0])
+    P = 2 * scipy.stats.t.sf(np.abs(T), df=X.shape[0] - 1)
     return B.item(), SE.item(), T.item(), P.item()
 
 
@@ -44,7 +44,7 @@ def build_dataset(seed, maf, n_samples, n_features, n_projections, n_variants):
         index=feature_ids,
         columns=projection_ids,
     )
-    P = feature_phenotypes.cov().rename_axis("feature2", axis=1)
+    P = (feature_phenotypes - feature_phenotypes.mean(axis=0)).cov().rename_axis("feature2", axis=1)
 
     s = G.var(axis=0)
 
@@ -78,5 +78,5 @@ def build_dataset(seed, maf, n_samples, n_features, n_projections, n_variants):
         "P": P,
         "s": s,
         "B": B,
-        "N": N,
+        "df": N - 2,
     }

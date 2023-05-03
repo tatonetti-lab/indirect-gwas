@@ -3,27 +3,29 @@ import pandas as pd
 import scipy.stats
 import xarray as xr
 
+from .io import IndirectGWASDataset
 
-def gwas_indirect(data: xr.Dataset):
+
+def gwas_indirect(data: IndirectGWASDataset):
     """
     Compute the indirect GWAS summary statistics
 
     Parameters
     ----------
-    data : xarray.Dataset
+    data : IndirectGWASDataset
         This should have the following dimensions:
             1. "feature"
             2. "variant"
             3. "projection"
             4. "feature2"
-        This should have the following data variables (dims):
+        This should have the following data variables (required dims first, ...=any):
             1. T (feature, projection, ...) - projection coefficients
             2. P (feature, feature2, ...) - feature covariance matrix
             3. s (variant, ...) - genotype dosage variance
             4. B (variant, feature, ...) - GWAS coefficient estimates for features
-            5. N (...) - sample size for each indirect GWAS
+            5. df (#variant ...) - degrees of freedom for each indirect GWAS
 
-        You can create this array from pandas/numpy/xarray using io.build_xarray
+        You can create this array, ensuring consistency using io.from_* functions
 
     Returns
     -------
@@ -46,7 +48,7 @@ def gwas_indirect(data: xr.Dataset):
         .dot(_SE_inner, dims=["feature"])
         .dot(data["T"].rename(feature="feature2"), dims=["feature2"])
     )
-    SE_indirect = np.sqrt(_SE_numerator / ((data["N"] - 2) * data["s"]))
+    SE_indirect = np.sqrt(_SE_numerator / (data["df"] * data["s"]))
 
     # t-statistics
     T_STAT_indirect = BETA_indirect / SE_indirect
@@ -55,7 +57,7 @@ def gwas_indirect(data: xr.Dataset):
     P_indirect = 2 * xr.apply_ufunc(
         scipy.stats.t.sf,
         np.abs(T_STAT_indirect),
-        data["N"],
+        data["df"],
         input_core_dims=[[], []],
         output_core_dims=[[]],
     )
@@ -72,7 +74,7 @@ def gwas_indirect_ufunc(
     feature_cov_mat: np.ndarray | pd.DataFrame,
     genotype_dosage_variance: float,
     feature_beta_hat: np.ndarray | pd.DataFrame,
-    n_samples: int,
+    df: int,
 ) -> tuple[float, float, float, float]:
     """
     Universal function to compute the indirect GWAS summary statistics for one variant
@@ -89,10 +91,10 @@ def gwas_indirect_ufunc(
         variable in GWAS
     feature_beta_hat : np.ndarray | pd.DataFrame, shape (n_features,)
         GWAS coefficients for the variant against each feature trait
-    n_samples : int
-        Number of samples for the indirect GWAS. How many samples you could include
-        for the GWAS if you were performing it directly. Typically, this is something
-        like the min/max of the number of samples for each feature.
+    df : int
+        Degrees of freedom for the indirect GWAS. How many samples you could include
+        for the GWAS if you were performing it directly minus the number of covariates
+        minus one.
 
     Returns
     -------
@@ -113,12 +115,11 @@ def gwas_indirect_ufunc(
         feature_beta_hat, feature_beta_hat
     )
     numerator = projection_coef_vec @ inner_term @ projection_coef_vec
-    denominator = (n_samples - 2) * genotype_dosage_variance
-    se_indirect = np.sqrt(numerator / denominator)
+    se_indirect = np.sqrt(numerator / (df * genotype_dosage_variance))
 
     # t-statistic
     t_stat_indirect = beta_hat_indirect / se_indirect
 
     # p-value
-    p_indirect = 2 * scipy.stats.t.sf(np.abs(t_stat_indirect), df=n_samples)
+    p_indirect = 2 * scipy.stats.t.sf(np.abs(t_stat_indirect), df=df)
     return beta_hat_indirect, se_indirect, t_stat_indirect, p_indirect

@@ -14,7 +14,7 @@ def build_xarray(T, P, s, B, N):
             "P": (["feature", "feature2"], P),
             "s": (["variant"], s),
             "B": (["variant", "feature"], B),
-            "N": (["variant", "projection"], N),
+            "df": (["variant", "projection"], N),
         }
     )
     return data
@@ -66,7 +66,7 @@ def test_gwas_indirect(dataset_name, random_seed):
 
     # Prepare data for gwas_indirect
     print(w.shape, P.shape, B.shape)
-    data_xarray = build_xarray(w, P, [s], B.T, [[dataset.shape[0]]])
+    data_xarray = build_xarray(w, P, [s], B.T, [[dataset.shape[0] - 2]])
 
     # Run gwas_indirect
     BETA_indirect, SE_indirect, _, _ = gwas_indirect(data_xarray)
