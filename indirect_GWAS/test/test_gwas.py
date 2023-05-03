@@ -5,7 +5,7 @@ import pandas as pd
 import xarray as xr
 
 from indirect_GWAS.gwas import gwas_indirect
-from indirect_GWAS.test.utils import ols_regression, build_dataset
+from .utils import ols_regression, build_dataset
 
 
 def build_comparison_df(raw_dataset: xr.Dataset):
