@@ -44,7 +44,11 @@ def build_dataset(seed, maf, n_samples, n_features, n_projections, n_variants):
         index=feature_ids,
         columns=projection_ids,
     )
-    P = (feature_phenotypes - feature_phenotypes.mean(axis=0)).cov().rename_axis("feature2", axis=1)
+    P = (
+        (feature_phenotypes - feature_phenotypes.mean(axis=0))
+        .cov()
+        .rename_axis("feature2", axis=1)
+    )
 
     s = G.var(axis=0)
 

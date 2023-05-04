@@ -226,7 +226,9 @@ def _check_projection_degrees_of_freedom(
         assert not projection_degrees_of_freedom.index.has_duplicates
 
         # Format the index
-        variant_index = projection_degrees_of_freedom.index.sort_values().rename("variant")
+        variant_index = projection_degrees_of_freedom.index.sort_values().rename(
+            "variant"
+        )
         return projection_degrees_of_freedom.loc[variant_index].rename("N")
     else:
         assert projection_degrees_of_freedom > 0
@@ -394,7 +396,9 @@ def from_summary_statistics(
     )
 
     # Set the projection sample size to min of feature GWAS sample sizes if not provided
-    if projection_sample_size is None and isinstance(feature_gwas_sample_size, pd.DataFrame):
+    if projection_sample_size is None and isinstance(
+        feature_gwas_sample_size, pd.DataFrame
+    ):
         projection_sample_size = feature_gwas_sample_size.min(axis=1)
     else:
         projection_sample_size = feature_gwas_sample_size

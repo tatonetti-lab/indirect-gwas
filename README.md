@@ -1,6 +1,7 @@
 # Indirect GWAS
 
-![Project workflow](https://github.com/zietzm/indirect_GWAS/actions/workflows/python-package.yml/badge.svg)
+[![Project workflow](https://github.com/zietzm/indirect_GWAS/actions/workflows/python-package.yml/badge.svg)](https://github.com/zietzm/indirect_GWAS/actions)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 Indirect GWAS allows you to compute GWAS summary statistics on a linear combination of traits without running the GWAS directly and without using individual-level data.
 
