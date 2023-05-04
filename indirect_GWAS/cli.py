@@ -4,8 +4,7 @@ import textwrap
 
 import pandas as pd
 
-
-from . import from_final_data, gwas_indirect, from_summary_statistics
+from . import from_final_data, from_summary_statistics, gwas_indirect
 from .io import compute_phenotypic_partial_covariance
 
 
@@ -480,9 +479,11 @@ def compute_feature_partial_covariance():
             # Load all columns
             covar_cols = None
 
-        covariates = pd.read_csv(
-            args.covar, sep=args.separator, usecols=covar_cols
-        ).set_index(args.sample_id_column).loc[feature_phenotypes.index]
+        covariates = (
+            pd.read_csv(args.covar, sep=args.separator, usecols=covar_cols)
+            .set_index(args.sample_id_column)
+            .loc[feature_phenotypes.index]
+        )
     else:
         # Covariates are found in the phenotype file
         covariates = feature_phenotypes[args.covar_name]
@@ -494,7 +495,7 @@ def compute_feature_partial_covariance():
             feature_phenotypes = feature_phenotypes.drop(args.sample_id_column, axis=1)
 
     if args.add_intercept:
-        covariates = covariates.assign(intercept=1.)
+        covariates = covariates.assign(intercept=1.0)
 
     feature_partial_covariance = compute_phenotypic_partial_covariance(
         feature_phenotypes=feature_phenotypes,
