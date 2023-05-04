@@ -7,3 +7,6 @@ dependencies = ["numpy", "pandas", "scipy", "xarray"]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[project.scripts]
+indirect-GWAS = "indirect_GWAS.cli:main"
+compute-feature-partial-covariance = "indirect_GWAS.cli:compute_feature_partial_covariance"

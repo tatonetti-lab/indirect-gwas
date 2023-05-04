@@ -7,14 +7,14 @@ class IndirectGWASDataset(Dataset):
     __slots__ = ("T", "P", "s", "B", "df")
 
 
-def compute_phenotypic_partial_variance(
+def compute_phenotypic_partial_covariance(
     feature_phenotypes: pd.DataFrame,
     covariates: pd.DataFrame,
     add_intercept: bool = True,
 ):
     """
-    Compute the partial variance of phenotypes not explained by covariates using
-     individual-level data.
+    Compute the partial covariance of phenotypes not explained by covariates using
+    individual-level data.
 
     This is the covariance of the residuals that arise when covariates are used to
     predict each feature phenotype. Only run this if needed. Runtime can be minutes or
@@ -62,8 +62,7 @@ def compute_genotype_partial_variance(
     feature_partial_covariance: pd.DataFrame,
     feature_gwas_coefficients: pd.DataFrame,
     feature_gwas_standard_error: pd.DataFrame,
-    feature_gwas_sample_size: int | pd.DataFrame,
-    n_covar: int | pd.DataFrame,
+    feature_gwas_dof: int | pd.DataFrame,
 ) -> pd.Series:
     """
     Compute the genotype partial variance for each variant.
@@ -81,8 +80,11 @@ def compute_genotype_partial_variance(
     This function assumes that all inputs have consistent indexes.
     """
     # Compute the variants x features matrix of genotype partial variance
-    feature_genotype_partial_variance = np.diag(feature_partial_covariance) / (
-        feature_gwas_standard_error**2 * (feature_gwas_sample_size - n_covar - 1)
+    feature_partial_variance = pd.Series(
+        np.diag(feature_partial_covariance), index=feature_partial_covariance.index
+    )
+    feature_genotype_partial_variance = feature_partial_variance / (
+        feature_gwas_standard_error**2 * feature_gwas_dof
         + feature_gwas_coefficients**2
     )
 
@@ -274,11 +276,6 @@ def from_individual_data(
     feature_gwas_sample_size : int | pd.DataFrame
         The number of samples used in each feature GWAS regression. Either the same
         value for every variant x feature or a DataFrame across (variants x features).
-    projection_sample_size : int | pd.Series | None, optional
-        The number of samples that would be included in each indirect GWAS regression.
-        Either the same value for all variants or a Series across variants. Default
-        (None) will use the minimum sample size across all variants from the feature
-        GWAS.
     add_intercept : bool, optional
         Whether to add a constant intercept term to the covariates, by default True
 
@@ -306,7 +303,7 @@ def from_individual_data(
         [feature_gwas_sample_size] = _check_gwas_sumstats(feature_gwas_sample_size)
 
     # Compute the phenotypic partial covariance matrix
-    feature_partial_covariance = compute_phenotypic_partial_variance(
+    feature_partial_covariance = compute_phenotypic_partial_covariance(
         feature_phenotypes,
         covariates,
         add_intercept=add_intercept,
@@ -319,7 +316,6 @@ def from_individual_data(
         feature_gwas_standard_error,
         feature_gwas_sample_size,
         n_covar,
-        projection_sample_size,
     )
 
 
@@ -328,9 +324,7 @@ def from_summary_statistics(
     feature_partial_covariance: pd.DataFrame,
     feature_gwas_coefficients: pd.DataFrame,
     feature_gwas_standard_error: pd.DataFrame,
-    feature_gwas_sample_size: int | pd.DataFrame,
-    n_covar: int | pd.DataFrame,
-    projection_sample_size: int | pd.Series | None = None,
+    feature_gwas_dof: int | pd.DataFrame,
 ) -> IndirectGWASDataset:
     """
     Build an IndirectGWASDataset from summary statistics.
@@ -351,17 +345,9 @@ def from_summary_statistics(
         variants x features
     feature_gwas_standard_error : pd.DataFrame
         variants x features
-    feature_gwas_sample_size : int | pd.DataFrame
-        The number of samples used in each feature GWAS regression. Either the same
+    feature_gwas_dof : int | pd.DataFrame
+        Degrees of freedom in each feature GWAS regression. Either the same
         value for every variant x feature or a DataFrame across (variants x features).
-    n_covar : int | pd.DataFrame
-        Number of covariates used in each feature GWAS. Either the same value for all
-        feature GWAS or a DataFrame across (variants x features).
-    projection_sample_size : int | pd.Series | None, optional
-        The number of samples that would be included in each indirect GWAS regression.
-        Either the same value for all variants or a Series across variants. Default
-        (None) will use the minimum sample size across all variants from the feature
-        GWAS.
 
     Returns
     -------
@@ -379,29 +365,24 @@ def from_summary_statistics(
     (
         feature_gwas_coefficients,
         feature_gwas_standard_error,
-    ) = _check_gwas_sumstats(
-        feature_gwas_coefficients,
-        feature_gwas_standard_error,
-    )
-    if isinstance(feature_gwas_sample_size, pd.DataFrame):
-        [feature_gwas_sample_size] = _check_gwas_sumstats(feature_gwas_sample_size)
+    ) = _check_gwas_sumstats(feature_gwas_coefficients, feature_gwas_standard_error)
+
+    if isinstance(feature_gwas_dof, pd.DataFrame):
+        [feature_gwas_dof] = _check_gwas_sumstats(feature_gwas_dof)
 
     # Compute the genotype partial variances
     genotype_partial_variance = compute_genotype_partial_variance(
         feature_partial_covariance=feature_partial_covariance,
         feature_gwas_coefficients=feature_gwas_coefficients,
         feature_gwas_standard_error=feature_gwas_standard_error,
-        feature_gwas_sample_size=feature_gwas_sample_size,
-        n_covar=n_covar,
+        feature_gwas_dof=feature_gwas_dof,
     )
 
-    # Set the projection sample size to min of feature GWAS sample sizes if not provided
-    if projection_sample_size is None and isinstance(
-        feature_gwas_sample_size, pd.DataFrame
-    ):
-        projection_sample_size = feature_gwas_sample_size.min(axis=1)
+    # Set the projection d.o.f. to min of feature GWAS d.o.f.
+    if isinstance(feature_gwas_dof, pd.DataFrame):
+        projection_dof = feature_gwas_dof.min(axis=1)
     else:
-        projection_sample_size = feature_gwas_sample_size
+        projection_dof = feature_gwas_dof
 
     # Build the dataset
     return from_final_data(
@@ -409,7 +390,7 @@ def from_summary_statistics(
         feature_partial_covariance,
         feature_gwas_coefficients,
         genotype_partial_variance,
-        projection_sample_size - n_covar - 1,
+        projection_dof,
     )
 
 
