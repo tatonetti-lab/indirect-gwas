@@ -31,7 +31,7 @@ To install, run
 pip install git+https://github.com/zietzm/indirect_GWAS.git
 ```
 
-This package uses Python 3.11 and depends on numpy, pandas, scipy, and xarray.
+This package uses Python >=3.10 and depends on numpy, pandas, scipy, and xarray.
 
 Once installed, this package exposes two command line arguments: `indirect-GWAS` and `compute-feature-partial-covariance`.
 For help with their arguments, either use the command line help (e.g. `indirect-GWAS --help`) or see the wiki.
