@@ -21,15 +21,12 @@ def build_xarray(T, P, s, B, N):
 
 
 def compute_direct_regression(data, x_col, y_col, w):
-    data['z'] = np.dot(data[y_col], w)
-    result = smf.ols(formula=f'z ~ {x_col}', data=data).fit()
+    data["z"] = np.dot(data[y_col], w)
+    result = smf.ols(formula=f"z ~ {x_col}", data=data).fit()
     return result.params, result.bse
 
 
-@pytest.mark.parametrize("dataset_name", [
-    "engel",
-    "grunfeld"
-])
+@pytest.mark.parametrize("dataset_name", ["engel", "grunfeld"])
 @pytest.mark.parametrize("random_seed", list(range(5)))
 def test_gwas_indirect(dataset_name, random_seed):
     # Load the dataset
@@ -51,7 +48,7 @@ def test_gwas_indirect(dataset_name, random_seed):
     B = []
     P = dataset[y_cols].cov().values
     for y_col in y_cols:
-        model = smf.ols(formula=f'{y_col} ~ {x_col}', data=dataset)
+        model = smf.ols(formula=f"{y_col} ~ {x_col}", data=dataset)
         result = model.fit()
         B.append(result.params[1])
 
