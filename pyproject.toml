@@ -1,11 +1,19 @@
 [project]
 name = "indirect_GWAS"
 version = "0.0.1"
+requires-python = ">=3.10"
+readme = "README.md"
 dependencies = ["numpy", "pandas", "scipy", "xarray"]
+authors = [
+    {name = "Michael Zietz", email = "michael.zietz@gmail.com"}
+]
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+test = ["pytest", "statsmodels", "flake8"]
 
 [project.scripts]
 indirect-GWAS = "indirect_GWAS.cli:main"
