@@ -13,7 +13,7 @@ We provide both command line and Python interfaces.
 ## Example usage
 
 ```bash
-indirect-GWAS \
+indirect-gwas \
   --projection-coefficients coef.csv \
   --gwas-summary-statistics gwas/*.linear \
   --variant-id-column RSID \
