@@ -1,6 +1,6 @@
 # Indirect GWAS
 
-[![Project workflow](https://github.com/zietzm/indirect_GWAS/actions/workflows/python-package.yml/badge.svg)](https://github.com/zietzm/indirect_GWAS/actions)
+[![Project workflow](https://github.com/tatonetti-lab/indirect-gwas/actions/workflows/python-package.yml/badge.svg)](https://github.com/tatonetti-lab/indirect-gwas/actions)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 Indirect GWAS allows you to compute GWAS summary statistics on a linear combination of traits without running the GWAS directly and without using individual-level data.
@@ -28,13 +28,13 @@ indirect-GWAS \
 
 To install, run
 ```
-pip install git+https://github.com/zietzm/indirect_GWAS.git
+pip install git+https://github.com/tatonetti-lab/indirect-gwas.git
 ```
 
 This package uses Python >=3.10 and depends on numpy, pandas, scipy, and xarray.
 
-Once installed, this package exposes two command line arguments: `indirect-GWAS` and `compute-feature-partial-covariance`.
-For help with their arguments, either use the command line help (e.g. `indirect-GWAS --help`) or see the wiki.
+Once installed, this package exposes two command line arguments: `indirect-gwas` and `compute-feature-partial-covariance`.
+For help with their arguments, either use the command line help (e.g. `indirect-gwas --help`) or see the wiki.
 
 # Inputs required
 

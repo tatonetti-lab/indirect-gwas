@@ -10,7 +10,7 @@ from .io import compute_phenotypic_partial_covariance
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="indirect-GWAS",
+        prog="indirect-gwas",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent(
             """
@@ -31,7 +31,7 @@ def main():
                    (-K/--n-covar or -K-column/--n-covar-column))
 
             For more information about these choices, see the documentation at
-            https://github.com/zietzm/indirect_GWAS/wiki.
+            https://github.com/tatonetti-lab/indirect-gwas/wiki.
 
             All paths are passed directly to pandas.read_csv with compression='infer'.
             By default, the first column is used as the index, and the first row is used

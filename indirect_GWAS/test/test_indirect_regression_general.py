@@ -4,7 +4,7 @@ import pytest
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
-from indirect_GWAS.gwas import gwas_indirect
+from indirect_gwas.gwas import gwas_indirect
 
 
 def build_xarray(T, P, s, B, N):
