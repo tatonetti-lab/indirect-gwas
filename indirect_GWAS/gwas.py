@@ -42,13 +42,13 @@ def gwas_indirect(data: IndirectGWASDataset):
     BETA_indirect = xr.dot(data["B"], data["T"], dims=["feature"])
 
     # Standard errors
-    _SE_inner = data["P"] - data["B"] * data["B"].rename(feature="feature2") * data["s"]
-    _SE_numerator = (
+    # Partial variance of the projected traits
+    var_p_z = (
         data["T"]
-        .dot(_SE_inner, dims=["feature"])
+        .dot(data["P"], dims=["feature"])
         .dot(data["T"].rename(feature="feature2"), dims=["feature2"])
     )
-    SE_indirect = np.sqrt(_SE_numerator / (data["df"] * data["s"]))
+    SE_indirect = np.sqrt((var_p_z / data["s"] - BETA_indirect**2) / data["df"])
 
     # t-statistics
     T_STAT_indirect = BETA_indirect / SE_indirect
@@ -108,18 +108,15 @@ def gwas_indirect_ufunc(
     reason to include it at all is for possible speedups during parallelization.
     """
     # Coefficient
-    beta_hat_indirect = feature_beta_hat @ projection_coef_vec
+    beta = feature_beta_hat @ projection_coef_vec
 
     # Standard error
-    inner_term = feature_cov_mat - genotype_dosage_variance * np.outer(
-        feature_beta_hat, feature_beta_hat
-    )
-    numerator = projection_coef_vec @ inner_term @ projection_coef_vec
-    se_indirect = np.sqrt(numerator / (df * genotype_dosage_variance))
+    var_p_z = projection_coef_vec @ feature_cov_mat @ projection_coef_vec
+    se = np.sqrt((var_p_z / genotype_dosage_variance - beta**2) / df)
 
     # t-statistic
-    t_stat_indirect = beta_hat_indirect / se_indirect
+    t_stat = beta / se
 
     # p-value
-    p_indirect = 2 * scipy.stats.t.sf(np.abs(t_stat_indirect), df=df)
-    return beta_hat_indirect, se_indirect, t_stat_indirect, p_indirect
+    p_value = 2 * scipy.stats.t.sf(np.abs(t_stat), df=df)
+    return beta, se, t_stat, p_value
