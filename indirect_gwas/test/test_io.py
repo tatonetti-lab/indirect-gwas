@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from indirect_GWAS.io import from_final_data
+from indirect_gwas.io import from_final_data
 
 
 def _create_names(n, prefix):

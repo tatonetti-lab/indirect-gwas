@@ -4,7 +4,7 @@ import pytest
 import pandas as pd
 import xarray as xr
 
-from indirect_GWAS.gwas import gwas_indirect
+from indirect_gwas.gwas import gwas_indirect
 from .utils import ols_regression, build_dataset
 
 
