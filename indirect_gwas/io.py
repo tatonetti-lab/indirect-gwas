@@ -244,7 +244,6 @@ def from_individual_data(
     feature_gwas_coefficients: pd.DataFrame,
     feature_gwas_standard_error: pd.DataFrame,
     feature_gwas_sample_size: int | pd.DataFrame,
-    projection_sample_size: int | pd.Series | None = None,
     add_intercept: bool = True,
 ) -> IndirectGWASDataset:
     """
@@ -314,8 +313,7 @@ def from_individual_data(
         feature_partial_covariance,
         feature_gwas_coefficients,
         feature_gwas_standard_error,
-        feature_gwas_sample_size,
-        n_covar,
+        feature_gwas_sample_size - n_covar - 1,
     )
 
 
