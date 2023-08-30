@@ -23,6 +23,7 @@ class IndirectGWAS:
         se_column: str = "SE",
         n_column: str = "OBS_CT",
         computation_dtype: str = "float32",
+        separator: str = "\t",
         quiet: bool = False,
     ):
         # Indirect GWAS data
@@ -38,6 +39,7 @@ class IndirectGWAS:
         )
         self.chunksize = chunksize
         self.computation_dtype = computation_dtype
+        self.separator = separator
         self.quiet = quiet
 
         # Column names
@@ -81,7 +83,7 @@ class IndirectGWAS:
         variant_ids = None
         for path in self.gwas_summary_statistics:
             file_variant_ids = pl.read_csv(
-                path, separator="\t", columns=[self.variant_id_column]
+                path, separator=self.separator, columns=[self.variant_id_column]
             )[self.variant_id_column].to_numpy()
             if variant_ids is None:
                 variant_ids = file_variant_ids
@@ -157,7 +159,7 @@ class IndirectGWAS:
     ):
         reader = pl.read_csv_batched(
             feature_gwas_path,
-            separator="\t",
+            separator=self.separator,
             has_header=True,
             batch_size=self.chunksize,
             columns=["BETA", "SE", "OBS_CT"],
