@@ -9,98 +9,6 @@ import polars as pl
 import scipy.stats
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--gwas-sumstats",
-        type=pathlib.Path,
-        nargs="+",
-        required=True,
-        help=(
-            "List of GWAS summary statistic files. Wildcards like result.*.glm may be"
-            " used"
-        ),
-    )
-    parser.add_argument(
-        "--projection-coefficients",
-        type=pathlib.Path,
-        required=True,
-        help="Path to the projection coefficients file.",
-    )
-    parser.add_argument(
-        "--feature-partial-covariance",
-        type=pathlib.Path,
-        required=True,
-        help="Path to the feature partial covariance file.",
-    )
-    parser.add_argument(
-        "--n-exogenous",
-        type=int,
-        required=True,
-        help=(
-            "Number of exogeneous variables in the projection model (i.e. number of"
-            " covariates + 1)."
-        ),
-    )
-    parser.add_argument(
-        "--output",
-        type=pathlib.Path,
-        required=True,
-        help=(
-            "Path to the output file. If --no-split is not specified, the output"
-            " will be split into separate files, one for each projection."
-        ),
-    )
-    parser.add_argument(
-        "--chunksize",
-        type=int,
-        default=100_000,
-        help="Chunk size for processing the GWAS files in number of variants",
-    )
-    parser.add_argument(
-        "--no-split",
-        action="store_true",
-        help="Flag to indicate whether to split the output into separate files.",
-    )
-    parser.add_argument(
-        "--variant-id-column",
-        default="ID",
-        help="Name of the column containing variant IDs in the input files.",
-    )
-    parser.add_argument(
-        "--beta-column",
-        default="BETA",
-        help="Name of the column containing beta values in the input files.",
-    )
-    parser.add_argument(
-        "--se-column",
-        default="SE",
-        help="Name of the column containing standard error values in the input files.",
-    )
-    parser.add_argument(
-        "--n-column",
-        default="OBS_CT",
-        help=(
-            "Name of the column containing observation count values in the input"
-            " files."
-        ),
-    )
-    parser.add_argument(
-        "--computation-dtype",
-        default="float32",
-        help=(
-            "Data type used for computations. Float32 will use less memory and"
-            " disk, but results in decreased precision."
-        ),
-    )
-    parser.add_argument(
-        "--quiet",
-        action="store_true",
-        help="Flag to enable quiet output.",
-    )
-    return parser.parse_args()
-
-
 class IndirectGWAS:
     def __init__(
         self,
@@ -125,6 +33,9 @@ class IndirectGWAS:
 
         # Options
         self.output = pathlib.Path(output)
+        self.output = (
+            self.output.with_suffix(".tsv") if self.output.suffix == "" else self.output
+        )
         self.chunksize = chunksize
         self.computation_dtype = computation_dtype
         self.quiet = quiet
@@ -286,7 +197,7 @@ class IndirectGWAS:
                 "beta": chunk[1].ravel("F"),
                 "se": chunk[3].ravel("F"),
                 "t": chunk[4].ravel("F"),
-                "p": chunk[5].ravel("F"),
+                "nlog10p": chunk[5].ravel("F"),
                 "dof": chunk[0].ravel("F"),
             }
         )
@@ -303,7 +214,7 @@ class IndirectGWAS:
                 output_path = self.output.with_name(
                     f"{self.output.stem}_{name}{self.output.suffix}"
                 )
-                group_df.to_csv(
+                group_df.drop(columns=["projection"]).to_csv(
                     output_path,
                     mode=("w" if chunk_idx == 0 else "a"),
                     header=(chunk_idx == 0),
@@ -345,10 +256,13 @@ class IndirectGWAS:
         )
         # t-statistic
         self.mmap[4] = self.mmap[1] / self.mmap[3]
-        # p-value
-        self.mmap[5] = -np.log10(
-            2 * scipy.stats.t.sf(np.abs(self.mmap[4]), self.mmap[0])
+        # p-value (-log10(2 * sf) is -1 * (log(sf) + log(2)) / log(10)
+        self.mmap[5] = (
+            -1
+            * (scipy.stats.t.logsf(np.abs(self.mmap[4]), self.mmap[0]) + np.log(2))
+            / np.log(10)
         )
+
         self.mmap.flush()
 
         # Write the output
@@ -362,43 +276,3 @@ class IndirectGWAS:
             print("Finished writing output, cleaning up temporary file")
 
         os.remove(self.memory_map_temporary_path)
-
-
-def main():
-    args = parse_args()
-
-    if not args.quiet:
-        # Print start datetime in human-readable format
-        print(f"Started at {datetime.datetime.now().strftime('%c')}")
-
-    # Read the projection coefficients
-    projection_coefficients = pd.read_csv(
-        args.projection_coefficients, sep="\t", index_col=0
-    )
-
-    # Read the feature partial covariance
-    feature_partial_covariance = pd.read_csv(
-        args.feature_partial_covariance, sep="\t", index_col=0
-    )
-
-    # Run the indirect GWAS
-    indirect_gwas = IndirectGWAS(
-        args.gwas_sumstats,
-        projection_coefficients,
-        feature_partial_covariance,
-        args.n_exogenous,
-        args.output,
-        chunksize=args.chunksize,
-        no_split=args.no_split,
-        variant_id_column=args.variant_id_column,
-        beta_column=args.beta_column,
-        se_column=args.se_column,
-        n_column=args.n_column,
-        computation_dtype=args.computation_dtype,
-        memory_map_temporary_path=args.memory_map_temporary_path,
-        quiet=args.quiet,
-    )
-    indirect_gwas.run()
-
-    if not args.quiet:
-        print(f"Finished at {datetime.datetime.now().strftime('%c')}")

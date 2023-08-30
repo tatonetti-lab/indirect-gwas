@@ -3,7 +3,7 @@ name = "indirect_gwas"
 version = "0.0.1"
 requires-python = ">=3.10"
 readme = "README.md"
-dependencies = ["numpy", "pandas", "scipy", "xarray"]
+dependencies = ["numpy", "pandas", "polars", "scipy"]
 authors = [
     {name = "Michael Zietz", email = "michael.zietz@gmail.com"}
 ]

@@ -5,7 +5,6 @@ import textwrap
 
 import pandas as pd
 
-from . import from_final_data, from_summary_statistics
 from .io import compute_phenotypic_partial_covariance
 from .igwas import IndirectGWAS
 
@@ -18,19 +17,16 @@ def parse_args():
             """
             Compute indirect GWAS summary statistics
 
-            Five main inputs are required:
+            Four main inputs are required:
             ------------------------------
             1. Projection coefficients (-P/--projection-coefficients)
             2. Feature partial covariance matrix (-C/--feature-partial-covariance)
-            3. Genotype partial variance
-                a. --standard-error-column or
-                b. -S/--genotype-partial-variance
-            4. Feature GWAS coefficient estimates (-gwas/--gwas-summary-statistics)
-            5. Indirect GWAS degrees of freedom
-                a. -dof/--degrees-of-freedom or
-                b. -dof-column/--degrees-of-freedom-column or
-                c. (-N/--sample-size or -N-column/--sample-size-column) and
-                   (-K/--n-covar or -K-column/--n-covar-column))
+            3. Feature GWAS summary statistics (-gwas/--gwas-summary-statistics)
+                a. --variant-id-column
+                b. --coefficient-column
+                c. --standard-error-column
+                d. --sample-size-column
+            4. Number of exogenous variables (-n/--number-of-exogenous)
 
             For more information about these choices, see the documentation at
             https://github.com/tatonetti-lab/indirect-gwas/wiki.
@@ -119,13 +115,6 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--extension",
-        type=str,
-        default=".csv",
-        help="Extension to use for output files. E.g. '.csv', '.csv.gz', '.tsv', etc.",
-    )
-
-    parser.add_argument(
         "--float-format",
         type=str,
         default="%.15f",
@@ -145,7 +134,7 @@ def parse_args():
 
     parser.add_argument(
         "--separator",
-        default=",",
+        default="\t",
         help="""Separator used to delimit fields in the input files. By default, this is
             a comma. To use a python escape like '\\t', use the $' bash syntax like
             `$'\\t'`.""",
@@ -168,7 +157,14 @@ def parse_args():
             'single', 'double', 'half', etc.""",
     )
 
-    return parser.parse_args()
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Whether to suppress progress messages.",
+    )
+
+    args = parser.parse_args()
+    return args
 
 
 def main():
