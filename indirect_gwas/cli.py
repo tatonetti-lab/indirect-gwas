@@ -1,14 +1,16 @@
 import argparse
+import datetime
 import pathlib
 import textwrap
 
 import pandas as pd
 
-from . import from_final_data, from_summary_statistics, gwas_indirect
+from . import from_final_data, from_summary_statistics
 from .io import compute_phenotypic_partial_covariance
+from .igwas import IndirectGWAS
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(
         prog="indirect-gwas",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -88,73 +90,21 @@ def main():
         help="""Column in the feature GWAS summary statistic files giving the standard
             error of the coefficient.""",
     )
-
-    # 1. Directly specified for the indirect GWAS (either a number or a file giving
-    #   variant-specific degrees of freedom)
-    # 2. Computed using the sample size and number of covariates (both can be given
-    #   either as a single number or a column name in the GWAS summary statistic files).
-    #   If given through feature GWAS, the degrees of freedom will be computed as the
-    #   variant-wise minimum across features.
-    # This leads to the following outline of groups and arguments:
-    # Direct DOF
-    #   -dof
-    # OR
-    # Indirect DOF
-    #   -dof-col
-    #   OR
-    #   Computed DOF
-    #       Sample size
-    #           -N
-    #           OR
-    #           -N-col
-    #       AND
-    #       Number of covariates
-    #           -K
-    #           OR
-    #           -K-col
     parser.add_argument(
-        "-dof",
-        "--degrees-of-freedom",
-        type=int,
-        help="Degrees of freedom for the feature GWAS",
-    )
-
-    parser.add_argument(
-        "-dof-column",
-        "--degrees-of-freedom-column",
-        type=str,
-        help="""Column in the feature GWAS summary statistic files giving the degrees of
-            freedom for each variant""",
-    )
-
-    sample_size_group = parser.add_mutually_exclusive_group()
-    sample_size_group.add_argument(
-        "-N",
-        "--equal-sample-size",
-        type=int,
-        help="Sample size for the feature GWAS",
-    )
-    sample_size_group.add_argument(
-        "-N-column",
         "--sample-size-column",
         type=str,
+        required=True,
         help="""Column in the feature GWAS summary statistic files giving the sample
             size for each variant""",
     )
 
-    n_covar_group = parser.add_mutually_exclusive_group()
-    n_covar_group.add_argument(
-        "-K",
-        "--equal-number-of-covariates",
+    parser.add_argument(
+        "--number-of-exogenous",
         type=int,
-        help="""Number of covariates for the feature GWAS""",
-    )
-    n_covar_group.add_argument(
-        "-K-column",
-        "--number-of-covariates-column",
-        type=str,
-        help="""Column in the feature GWAS summary statistic files giving the number of
-            covariates for each variant""",
+        required=True,
+        dest="n_exogenous",
+        help="""Number of exogenous variables for the feature GWAS. E.g.
+            phenotype ~ 1 + genotype + age + sex + PC1 + PC2 would have 5 exogenous""",
     )
 
     parser.add_argument(
@@ -162,6 +112,7 @@ def main():
         "--output",
         type=pathlib.Path,
         required=True,
+        dest="output",
         help="""Path to the output file(s). For every projection, a file will be created
             with the name <output>_<projection><extension>. Existing files will be
             overwritten.""",
@@ -200,52 +151,55 @@ def main():
             `$'\\t'`.""",
     )
 
-    args = parser.parse_args()
-
-    # Check that the degrees of freedom are valid (since we can't use nested groups)
-    if (args.degrees_of_freedom is None) and (args.degrees_of_freedom_column is None):
-        if ((args.equal_sample_size is None) and (args.sample_size_column is None)) or (
-            (args.equal_number_of_covariates is None)
-            and (args.number_of_covariates_column is None)
-        ):
-            raise ValueError(
-                "Either -dof, -dof-file, -dof-column, or -N/-N-column and -K/-K-column "
-                "must be provided"
-            )
-
-    # Run the indirect gwas
-    indirect_gwas_ds = load_data(args)
-    (
-        indirect_gwas_ds["beta"],
-        indirect_gwas_ds["se"],
-        indirect_gwas_ds["t_stat"],
-        indirect_gwas_ds["p"],
-    ) = gwas_indirect(indirect_gwas_ds)
-
-    # Save the results
-    save_data(
-        indirect_gwas_ds, args.output, args.separator, args.extension, args.float_format
+    parser.add_argument(
+        "--chunksize",
+        type=int,
+        default=100_000,
+        help="""Number of rows to read at a time. Passed directly to pandas.read_csv.
+            This can be used to reduce memory usage.""",
     )
 
+    parser.add_argument(
+        "--computation-dtype",
+        type=str,
+        default="double",
+        help="""Data type to use for computations. Passed directly to pandas.read_csv.
+            This can be used to reduce memory usage. E.g. 'float32', 'float64',
+            'single', 'double', 'half', etc.""",
+    )
 
-def load_gwas_summary_statistics(
-    files: list[pathlib.Path],
-    variant_id_column: str,
-    other_columns: list[str],
-    separator: str = ",",
-) -> pd.DataFrame:
-    cols = [variant_id_column] + other_columns
-    dataframes = []
+    return parser.parse_args()
 
-    for file in files:
-        df = (
-            pd.read_csv(file, compression="infer", usecols=cols, sep=separator)
-            .assign(feature=file.stem)
-            .set_index(variant_id_column)
-        )
-        dataframes.append(df)
 
-    return pd.concat(dataframes)
+def main():
+    args = parse_args()
+
+    if not args.quiet:
+        # Print start datetime in human-readable format
+        print(f"Started at {datetime.datetime.now().strftime('%c')}")
+
+    # Load projection coefficients and feature partial covariance matrix
+    projection_coefficients, feature_partial_covariance = load_data(args)
+
+    # Compute the indirect GWAS
+    indirect_gwas = IndirectGWAS(
+        gwas_summary_statistics=args.gwas_summary_statistics,
+        projection_coefficients=projection_coefficients,
+        feature_partial_covariance=feature_partial_covariance,
+        n_exogenous=args.n_exogenous,
+        output=args.output,
+        chunksize=args.chunksize,
+        variant_id_column=args.variant_id_column,
+        beta_column=args.coefficient_column,
+        se_column=args.standard_error_column,
+        n_column=args.sample_size_column,
+        computation_dtype=args.computation_dtype,
+        quiet=args.quiet,
+    )
+    indirect_gwas.run()
+
+    if not args.quiet:
+        print(f"Finished at {datetime.datetime.now().strftime('%c')}")
 
 
 def load_data(args):
@@ -269,101 +223,7 @@ def load_data(args):
         index_col=index_col,
         sep=args.separator,
     )
-
-    # Gather the columns names that we need to load from each feature GWAS file
-    gwas_columns = [
-        args.coefficient_column,
-        args.standard_error_column,
-        args.degrees_of_freedom_column,
-        args.sample_size_column,
-        args.number_of_covariates_column,
-    ]
-    feature_gwas_df = load_gwas_summary_statistics(
-        files=args.gwas_summary_statistics,
-        variant_id_column=args.variant_id_column,
-        other_columns=[col for col in gwas_columns if col is not None],
-        separator=args.separator,
-    )
-
-    feature_gwas_coefficients = feature_gwas_df.pivot_table(
-        index=args.variant_id_column, columns="feature", values=args.coefficient_column
-    )
-
-    # Load the degrees of freedom
-    if args.degrees_of_freedom is not None:
-        feature_gwas_dof = args.degrees_of_freedom
-        projection_dof = args.degrees_of_freedom
-    elif args.degrees_of_freedom_column is not None:
-        feature_gwas_dof = feature_gwas_df.pivot_table(
-            index=args.variant_id_column,
-            columns="feature",
-            values=args.degrees_of_freedom_column,
-        )
-        projection_dof = feature_gwas_dof.min(axis=1)
-    else:
-        if args.equal_sample_size is not None:
-            sample_sizes = args.equal_sample_size
-        else:
-            sample_sizes = feature_gwas_df.pivot_table(
-                index=args.variant_id_column,
-                columns="feature",
-                values=args.sample_size_column,
-            )
-
-        if args.equal_number_of_covariates is not None:
-            number_of_covariates = args.equal_number_of_covariates
-        else:
-            number_of_covariates = feature_gwas_df.pivot_table(
-                index=args.variant_id_column,
-                columns="feature",
-                values=args.number_of_covariates_column,
-            )
-        feature_gwas_dof = projection_dof = sample_sizes - number_of_covariates - 1
-
-    # Compute the genotypic partial variance if needed
-    if args.genotype_partial_variance is not None:
-        genotype_partial_variance = pd.read_csv(
-            args.genotype_partial_variance,
-            header=header,
-            index_col=index_col,
-            sep=args.separator,
-        )
-        return from_final_data(
-            projection_coefficients=projection_coefficients,
-            feature_partial_covariance=feature_partial_covariance,
-            feature_gwas_coefficients=feature_gwas_coefficients,
-            genotype_partial_variance=genotype_partial_variance,
-            projection_degrees_of_freedom=projection_dof,
-        )
-    else:
-        feature_gwas_standard_error = feature_gwas_df.pivot_table(
-            index=args.variant_id_column,
-            columns="feature",
-            values=args.standard_error_column,
-        )
-        return from_summary_statistics(
-            projection_coefficients=projection_coefficients,
-            feature_partial_covariance=feature_partial_covariance,
-            feature_gwas_coefficients=feature_gwas_coefficients,
-            feature_gwas_standard_error=feature_gwas_standard_error,
-            feature_gwas_dof=feature_gwas_dof,
-        )
-
-
-def save_data(dataset, output_path, separator, output_extension, float_format):
-    for projection in dataset["projection"].values:
-        (
-            dataset.sel(projection=projection)
-            .drop("projection")[["beta", "se", "t_stat", "p"]]
-            .to_dataframe()
-            .to_csv(
-                output_path.with_name(
-                    f"{output_path.name}_{projection}{output_extension}"
-                ),
-                sep=separator,
-                float_format=float_format,
-            )
-        )
+    return projection_coefficients, feature_partial_covariance
 
 
 def compute_feature_partial_covariance():
