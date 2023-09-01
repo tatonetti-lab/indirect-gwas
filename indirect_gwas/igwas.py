@@ -1,5 +1,3 @@
-import argparse
-import datetime
 import os
 import pathlib
 
@@ -162,7 +160,7 @@ class IndirectGWAS:
             separator=self.separator,
             has_header=True,
             batch_size=self.chunksize,
-            columns=["BETA", "SE", "OBS_CT"],
+            columns=[self.beta_column, self.se_column, self.n_column],
         )
         last_index = 0
         while True:
