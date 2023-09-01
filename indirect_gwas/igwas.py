@@ -170,9 +170,9 @@ class IndirectGWAS:
 
             chunk = chunks[0]
 
-            beta = chunk["BETA"].to_numpy().astype(self.computation_dtype)
-            se = chunk["SE"].to_numpy().astype(self.computation_dtype)
-            N = chunk["OBS_CT"].to_numpy().astype(self.computation_dtype)
+            beta = chunk[self.beta_column].to_numpy().astype(self.computation_dtype)
+            se = chunk[self.se_column].to_numpy().astype(self.computation_dtype)
+            N = chunk[self.n_column].to_numpy().astype(self.computation_dtype)
 
             current_chunk = self.mmap[:, :, last_index : last_index + len(chunk)]
 
