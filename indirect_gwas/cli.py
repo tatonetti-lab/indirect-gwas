@@ -190,6 +190,7 @@ def main():
         se_column=args.standard_error_column,
         n_column=args.sample_size_column,
         computation_dtype=args.computation_dtype,
+        separator=args.separator,
         quiet=args.quiet,
     )
     indirect_gwas.run()
