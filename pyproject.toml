@@ -3,7 +3,6 @@ name = "indirect_gwas"
 version = "0.0.1"
 requires-python = ">=3.10"
 readme = "README.md"
-dependencies = ["numpy", "pandas", "polars", "scipy"]
 authors = [
     {name = "Michael Zietz", email = "michael.zietz@gmail.com"}
 ]
@@ -16,7 +15,7 @@ requires = ["setuptools", "pybind11>=2.6.1"]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
-test = ["pytest", "statsmodels", "flake8"]
+test = ["pytest", "statsmodels", "flake8", "pandas", "scipy"]
 
 [project.scripts]
 indirect-gwas = "indirect_gwas.cli:main"

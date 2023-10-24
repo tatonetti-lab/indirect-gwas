@@ -27,10 +27,6 @@ def parse_args():
 
             For more information about these choices, see the documentation at
             https://github.com/tatonetti-lab/indirect-gwas/wiki.
-
-            All paths are passed directly to pandas.read_csv with compression='infer'.
-            By default, the first column is used as the index, and the first row is used
-            as the column names. To disable this behavior, use the --no-index flag.
             """
         ),
     )
@@ -115,8 +111,7 @@ def parse_args():
     #     "--float-format",
     #     type=str,
     #     default="%.15f",
-    #     help="""Format string for writing floating point numbers. Passed directly to
-    #         pandas.DataFrame.to_csv.""",
+    #     help="""Format string for writing floating point numbers.""",
     # )
 
     # parser.add_argument(
@@ -141,15 +136,14 @@ def parse_args():
         "--chunksize",
         type=int,
         default=100_000,
-        help="""Number of rows to read at a time. Passed directly to pandas.read_csv.
-            This can be used to reduce memory usage.""",
+        help="""Number of rows to read at a time. This can be used to reduce memory usage.""",
     )
 
     # parser.add_argument(
     #     "--computation-dtype",
     #     type=str,
     #     default="double",
-    #     help="""Data type to use for computations. Passed directly to pandas.read_csv.
+    #     help="""Data type to use for computations.
     #         This can be used to reduce memory usage. E.g. 'float32', 'float64',
     #         'single', 'double', 'half', etc.""",
     # )
