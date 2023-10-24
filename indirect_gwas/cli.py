@@ -6,7 +6,7 @@ import textwrap
 import pandas as pd
 
 from .io import compute_phenotypic_partial_covariance
-from .igwas import IndirectGWAS
+import _igwas
 
 
 def parse_args():
@@ -114,31 +114,31 @@ def parse_args():
             overwritten.""",
     )
 
-    parser.add_argument(
-        "--float-format",
-        type=str,
-        default="%.15f",
-        help="""Format string for writing floating point numbers. Passed directly to
-            pandas.DataFrame.to_csv.""",
-    )
+    # parser.add_argument(
+    #     "--float-format",
+    #     type=str,
+    #     default="%.15f",
+    #     help="""Format string for writing floating point numbers. Passed directly to
+    #         pandas.DataFrame.to_csv.""",
+    # )
 
-    parser.add_argument(
-        "--no-index",
-        action="store_false",
-        dest="has_index",
-        help="""Whether to treat the first row and column of files as the names for the
-            respective dimensions. If this flag is set, the first column and row will be
-            treated as data, and the features/projections will be named 'feature_0',
-            'feature_1', 'projection_0', etc.""",
-    )
+    # parser.add_argument(
+    #     "--no-index",
+    #     action="store_false",
+    #     dest="has_index",
+    #     help="""Whether to treat the first row and column of files as the names for the
+    #         respective dimensions. If this flag is set, the first column and row will be
+    #         treated as data, and the features/projections will be named 'feature_0',
+    #         'feature_1', 'projection_0', etc.""",
+    # )
 
-    parser.add_argument(
-        "--separator",
-        default="\t",
-        help="""Separator used to delimit fields in the input files. By default, this is
-            a comma. To use a python escape like '\\t', use the $' bash syntax like
-            `$'\\t'`.""",
-    )
+    # parser.add_argument(
+    #     "--separator",
+    #     default="\t",
+    #     help="""Separator used to delimit fields in the input files. By default, this is
+    #         a comma. To use a python escape like '\\t', use the $' bash syntax like
+    #         `$'\\t'`.""",
+    # )
 
     parser.add_argument(
         "--chunksize",
@@ -148,14 +148,14 @@ def parse_args():
             This can be used to reduce memory usage.""",
     )
 
-    parser.add_argument(
-        "--computation-dtype",
-        type=str,
-        default="double",
-        help="""Data type to use for computations. Passed directly to pandas.read_csv.
-            This can be used to reduce memory usage. E.g. 'float32', 'float64',
-            'single', 'double', 'half', etc.""",
-    )
+    # parser.add_argument(
+    #     "--computation-dtype",
+    #     type=str,
+    #     default="double",
+    #     help="""Data type to use for computations. Passed directly to pandas.read_csv.
+    #         This can be used to reduce memory usage. E.g. 'float32', 'float64',
+    #         'single', 'double', 'half', etc.""",
+    # )
 
     parser.add_argument(
         "--quiet",
@@ -174,26 +174,18 @@ def main():
         # Print start datetime in human-readable format
         print(f"Started at {datetime.datetime.now().strftime('%c')}")
 
-    # Load projection coefficients and feature partial covariance matrix
-    projection_coefficients, feature_partial_covariance = load_data(args)
-
-    # Compute the indirect GWAS
-    indirect_gwas = IndirectGWAS(
-        gwas_summary_statistics=args.gwas_summary_statistics,
-        projection_coefficients=projection_coefficients,
-        feature_partial_covariance=feature_partial_covariance,
-        n_exogenous=args.n_exogenous,
-        output=args.output,
-        chunksize=args.chunksize,
-        variant_id_column=args.variant_id_column,
-        beta_column=args.coefficient_column,
-        se_column=args.standard_error_column,
-        n_column=args.sample_size_column,
-        computation_dtype=args.computation_dtype,
-        separator=args.separator,
-        quiet=args.quiet,
+    _igwas.run(
+        args.gwas_summary_statistics,
+        args.variant_id_column,
+        args.coefficient_column,
+        args.standard_error_column,
+        args.sample_size_column,
+        args.projection_coefficients,
+        args.feature_partial_covariance,
+        args.output,
+        args.n_exogenous,
+        args.chunksize,
     )
-    indirect_gwas.run()
 
     if not args.quiet:
         print(f"Finished at {datetime.datetime.now().strftime('%c')}")

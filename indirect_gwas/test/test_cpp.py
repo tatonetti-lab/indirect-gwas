@@ -128,7 +128,3 @@ def test_pvalues(t, df):
     cpp_version = indirect_gwas._igwas.compute_pvalue(t, df)
     print(python_version, cpp_version)
     assert cpp_version == pytest.approx(python_version)
-
-
-if __name__ == "__main__":
-    test_cpp()

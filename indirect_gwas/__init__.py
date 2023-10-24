@@ -1,2 +1,5 @@
 from .igwas import IndirectGWAS
-from .io import compute_phenotypic_partial_covariance
+import _igwas
+# from .io import compute_phenotypic_partial_covariance
+
+# __all__ = ["IndirectGWAS"]
