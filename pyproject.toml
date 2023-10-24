@@ -8,8 +8,11 @@ authors = [
     {name = "Michael Zietz", email = "michael.zietz@gmail.com"}
 ]
 
+[tool.setuptools]
+packages = ["indirect_gwas"]
+
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools", "pybind11>=2.6.1"]
 build-backend = "setuptools.build_meta"
 
 [project.optional-dependencies]
