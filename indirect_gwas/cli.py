@@ -3,8 +3,6 @@ import datetime
 import pathlib
 import textwrap
 
-import pandas as pd
-
 import _igwas
 
 

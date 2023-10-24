@@ -7,10 +7,10 @@
 // Create a struct to store the columns to read
 struct ColumnSpec
 {
-    std::string variant_id_column;
-    std::string beta_column;
-    std::string se_column;
-    std::string sample_size_column;
+    std::string variant_id;
+    std::string beta;
+    std::string se;
+    std::string sample_size;
 };
 
 // Create a struct to store a matrix and its row and column names

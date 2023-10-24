@@ -13,24 +13,27 @@ IndirectGWAS::IndirectGWAS(
     // Load the full feature partial covariance matrix
     LabeledMatrix feature_partial_covariance = read_input_matrix(feature_partial_covariance_filename);
 
-    // Extract the diagonal of the feature partial covariance matrix
-    feature_partial_variance = {feature_partial_covariance.data.diagonal(), feature_partial_covariance.row_names};
-
-    // Compute the partial variance of each projection
-    projection_partial_variance = {
-        (projection_coefficients.data.transpose() * feature_partial_covariance.data * projection_coefficients.data).diagonal(),
-        projection_coefficients.column_names};
+    auto &projection_names = projection_coefficients.column_names;
+    auto &feature_names = feature_partial_covariance.row_names;
 
     // Check that the features are the same in both files
-    ensure_names_consistent(projection_coefficients.row_names, feature_partial_variance.names);
+    ensure_names_consistent(projection_coefficients.row_names, feature_names);
+
+    // Extract the diagonal of the feature partial covariance matrix
+    auto &C = feature_partial_covariance.data;
+    feature_partial_variance = {C.diagonal(), feature_names};
+
+    // Compute the partial variance of each projection
+    auto &P = projection_coefficients.data;
+    projection_partial_variance = {(P.transpose() * C * P).diagonal(), projection_names};
 
     // Compute the number of features and projections
-    n_features = feature_partial_variance.names.size();
-    n_projections = projection_coefficients.data.cols();
+    n_features = feature_names.size();
+    n_projections = projection_names.size();
 
     // Initialize the chunk matrices
     degrees_of_freedom = {Eigen::VectorXd::Zero(0), variant_ids};
-    beta = {Eigen::MatrixXd::Zero(0, n_projections), variant_ids, projection_coefficients.column_names};
+    beta = {Eigen::MatrixXd::Zero(0, n_projections), variant_ids, projection_names};
     gpv_sum = {Eigen::VectorXd::Zero(0), variant_ids};
 }
 
@@ -63,10 +66,10 @@ std::unordered_map<std::string, unsigned int> IndirectGWAS::get_header_indexes(s
     std::string header;
     while (std::getline(iss, header, ','))
     {
-        if (header == column_names.variant_id_column ||
-            header == column_names.beta_column ||
-            header == column_names.se_column ||
-            header == column_names.sample_size_column)
+        if (header == column_names.variant_id ||
+            header == column_names.beta ||
+            header == column_names.se ||
+            header == column_names.sample_size)
         {
             results[header] = i;
         }
@@ -79,10 +82,10 @@ std::unordered_map<std::string, unsigned int> IndirectGWAS::get_header_indexes(s
     {
         std::cerr << "Error: could not find all four columns in the header line" << std::endl;
         std::cerr << "Header line: " << header_line << std::endl;
-        std::cerr << "Variant ID column: " << column_names.variant_id_column << std::endl;
-        std::cerr << "Beta column: " << column_names.beta_column << std::endl;
-        std::cerr << "Standard error column: " << column_names.se_column << std::endl;
-        std::cerr << "Sample size column: " << column_names.sample_size_column << std::endl;
+        std::cerr << "Variant ID column: " << column_names.variant_id << std::endl;
+        std::cerr << "Beta column: " << column_names.beta << std::endl;
+        std::cerr << "Standard error column: " << column_names.se << std::endl;
+        std::cerr << "Sample size column: " << column_names.sample_size << std::endl;
         throw std::runtime_error("Error: could not find all four columns in the header line");
     }
 
@@ -96,12 +99,13 @@ void IndirectGWAS::read_file_chunk(
 {
     // Read the file
     std::ifstream file(filename);
-    if (!file.is_open()) throw std::runtime_error("Error: could not open file " + filename);
+    if (!file.is_open())
+        throw std::runtime_error("Error: could not open file " + filename);
 
     // Read the header line
     std::string line;
     std::getline(file, line);
-    auto header_indexes = get_header_indexes(line);
+    auto header_index = get_header_indexes(line);
 
     // Read the data into vectors
     bool fill_variant_ids = variant_ids.size() == 0;
@@ -132,20 +136,20 @@ void IndirectGWAS::read_file_chunk(
         // Populate variant IDs or check that they match
         if (fill_variant_ids)
         {
-            variant_ids.push_back(data[header_indexes[column_names.variant_id_column]]);
+            variant_ids.push_back(data[header_index[column_names.variant_id]]);
         }
         else
         {
-            if (variant_ids[row_index - start_row] != data[header_indexes[column_names.variant_id_column]])
+            if (variant_ids[row_index - start_row] != data[header_index[column_names.variant_id]])
             {
                 throw std::runtime_error("Error: variant IDs do not match between files");
             }
         }
 
         // Populate the data vectors
-        beta_vec(row_index - start_row) = std::stod(data[header_indexes[column_names.beta_column]]);
-        std_error_vec(row_index - start_row) = std::stod(data[header_indexes[column_names.se_column]]);
-        sample_size_vec(row_index - start_row) = std::stoi(data[header_indexes[column_names.sample_size_column]]);
+        beta_vec(row_index - start_row) = std::stod(data[header_index[column_names.beta]]);
+        std_error_vec(row_index - start_row) = std::stod(data[header_index[column_names.se]]);
+        sample_size_vec(row_index - start_row) = std::stoi(data[header_index[column_names.sample_size]]);
         row_index++;
     }
 }
@@ -207,7 +211,8 @@ void IndirectGWAS::compute_standard_error(ResultsChunk &results)
     se = se.cwiseSqrt();
 }
 
-void IndirectGWAS::compute_p_value(ResultsChunk &results) {
+void IndirectGWAS::compute_p_value(ResultsChunk &results)
+{
     Eigen::MatrixXd &t = results.t_statistic;
     Eigen::VectorXd &dof = degrees_of_freedom.data;
     Eigen::MatrixXd &p = results.neg_log10_p_value;
@@ -227,7 +232,6 @@ void IndirectGWAS::compute_p_value(ResultsChunk &results) {
         }
     }
 }
-
 
 ResultsChunk IndirectGWAS::compute_results_chunk()
 {
