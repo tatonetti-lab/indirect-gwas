@@ -22,22 +22,7 @@ IndirectGWAS::IndirectGWAS(
         projection_coefficients.column_names};
 
     // Check that the features are the same in both files
-    if (projection_coefficients.row_names != feature_partial_variance.names)
-    {
-        std::cerr << "Error: feature names do not match between files" << std::endl;
-
-        std::cerr << "Projection coefficients names: ";
-        for (auto name : projection_coefficients.row_names)
-            std::cerr << name << " ";
-        std::cerr << std::endl;
-
-        std::cerr << "Feature partial variance names: ";
-        for (auto name : feature_partial_variance.names)
-            std::cerr << name << " ";
-        std::cerr << std::endl;
-
-        throw std::runtime_error("Feature names do not match");
-    }
+    ensure_names_consistent(projection_coefficients.row_names, feature_partial_variance.names);
 
     // Compute the number of features and projections
     n_features = feature_partial_variance.names.size();
@@ -49,68 +34,69 @@ IndirectGWAS::IndirectGWAS(
     gpv_sum = {Eigen::VectorXd::Zero(0), variant_ids};
 }
 
+void IndirectGWAS::ensure_names_consistent(std::vector<std::string> names_1,
+                                           std::vector<std::string> names_2)
+{
+    if (names_1 != names_2)
+    {
+        std::cerr << "Error: feature names do not match between files" << std::endl;
+
+        std::cerr << "First group: ";
+        for (auto name : names_1)
+            std::cerr << name << " ";
+        std::cerr << std::endl;
+
+        std::cerr << "Second group: ";
+        for (auto name : names_2)
+            std::cerr << name << " ";
+        std::cerr << std::endl;
+
+        throw std::runtime_error("Feature names do not match");
+    }
+}
+
 std::unordered_map<std::string, unsigned int> IndirectGWAS::get_header_indexes(std::string header_line)
 {
     std::istringstream iss(header_line);
-    std::vector<std::string> headers;
+    std::unordered_map<std::string, unsigned int> results;
+    int i = 0;
     std::string header;
     while (std::getline(iss, header, ','))
     {
-        headers.push_back(header);
+        if (header == column_names.variant_id_column ||
+            header == column_names.beta_column ||
+            header == column_names.se_column ||
+            header == column_names.sample_size_column)
+        {
+            results[header] = i;
+        }
+
+        i++;
     }
 
-    int variant_id_index = -1, beta_index = -1, se_index = -1, sample_size_index = -1;
-    for (int i = 0; i < headers.size(); i++)
+    // Check that all four columns were found. If not, print some details and throw an error.
+    if (results.size() != 4)
     {
-        if (headers[i] == column_names.variant_id_column)
-        {
-            variant_id_index = i;
-        }
-        else if (headers[i] == column_names.beta_column)
-        {
-            beta_index = i;
-        }
-        else if (headers[i] == column_names.se_column)
-        {
-            se_index = i;
-        }
-        else if (headers[i] == column_names.sample_size_column)
-        {
-            sample_size_index = i;
-        }
+        std::cerr << "Error: could not find all four columns in the header line" << std::endl;
+        std::cerr << "Header line: " << header_line << std::endl;
+        std::cerr << "Variant ID column: " << column_names.variant_id_column << std::endl;
+        std::cerr << "Beta column: " << column_names.beta_column << std::endl;
+        std::cerr << "Standard error column: " << column_names.se_column << std::endl;
+        std::cerr << "Sample size column: " << column_names.sample_size_column << std::endl;
+        throw std::runtime_error("Error: could not find all four columns in the header line");
     }
 
-    // Do not allow missing columns
-    if (variant_id_index < 0)
-    {
-        throw std::runtime_error("Could not find column " + column_names.variant_id_column);
-    }
-    if (beta_index < 0)
-    {
-        throw std::runtime_error("Could not find column " + column_names.beta_column);
-    }
-    if (se_index < 0)
-    {
-        throw std::runtime_error("Could not find column " + column_names.se_column);
-    }
-    if (sample_size_index < 0)
-    {
-        throw std::runtime_error("Could not find column " + column_names.sample_size_column);
-    }
-
-    return {
-        {column_names.variant_id_column, variant_id_index},
-        {column_names.beta_column, beta_index},
-        {column_names.se_column, se_index},
-        {column_names.sample_size_column, sample_size_index}};
+    return results;
 }
 
-void IndirectGWAS::read_file_chunk(std::string filename, unsigned int start_row, unsigned int end_row)
+void IndirectGWAS::read_file_chunk(
+    std::string filename,
+    unsigned int start_row,
+    unsigned int end_row)
 {
     // Read the file
     std::ifstream file(filename);
-    if (!file.is_open())
-        throw std::runtime_error("Error: could not open file " + filename);
+    if (!file.is_open()) throw std::runtime_error("Error: could not open file " + filename);
 
     // Read the header line
     std::string line;
@@ -132,9 +118,9 @@ void IndirectGWAS::read_file_chunk(std::string filename, unsigned int start_row,
             continue;
         }
         if (row_index > end_row)
-        {
             break;
-        }
+
+        // TODO: Could greatly optimize this by not reading the entire line
         std::istringstream iss(line);
         std::vector<std::string> data;
         std::string datum;
@@ -164,13 +150,17 @@ void IndirectGWAS::read_file_chunk(std::string filename, unsigned int start_row,
     }
 }
 
-void IndirectGWAS::process_file_chunk(unsigned int k, std::string filename, unsigned int start_row, unsigned int end_row)
+void IndirectGWAS::process_file_chunk(
+    unsigned int k, std::string filename,
+    unsigned int start_row,
+    unsigned int end_row)
 {
     // Read the data
     read_file_chunk(filename, start_row, end_row);
 
     // Update the degrees of freedom as the minimum of the current degrees of freedom
-    // and the current (sample size - number of exogenous variables - 1)
+    // and the current (sample size - number of exogenous variables - 1).
+    // Note that the number of exogenous is n_covariates + 1.
     Eigen::VectorXd new_dof = sample_size_vec.array() - n_covariates - 2;
     if (k == 0)
     {
@@ -195,51 +185,64 @@ void IndirectGWAS::process_file_chunk(unsigned int k, std::string filename, unsi
     gpv_sum.data += (denominator.cwiseInverse() * feature_partial_variance.data[k]);
 }
 
+// Split the standard error computation into a separate function for readability
+void IndirectGWAS::compute_standard_error(ResultsChunk &results)
+{
+    // Create a reference to gpv_sum that is called gpv_mean (to avoid ambiguity)
+    Eigen::VectorXd &gpv = gpv_sum.data;
+    gpv /= n_features;
+
+    // Reference to the standard error matrix
+    Eigen::MatrixXd &se = results.std_error;
+
+    se = -results.beta.array().square();
+    for (int i = 0; i < se.rows(); i++)
+    {
+        for (int j = 0; j < se.cols(); j++)
+        {
+            se(i, j) += projection_partial_variance.data(j) / gpv(i);
+            se(i, j) /= degrees_of_freedom.data(i);
+        }
+    }
+    se = se.cwiseSqrt();
+}
+
+void IndirectGWAS::compute_p_value(ResultsChunk &results) {
+    Eigen::MatrixXd &t = results.t_statistic;
+    Eigen::VectorXd &dof = degrees_of_freedom.data;
+    Eigen::MatrixXd &p = results.neg_log10_p_value;
+
+    p.resizeLike(t);
+    for (int i = 0; i < t.rows(); i++)
+    {
+        for (int j = 0; j < t.cols(); j++)
+        {
+            if (dof(i) <= 0 || std::isnan(dof(i)))
+            {
+                throw std::runtime_error("Degrees of freedom is an error for variant " +
+                                         results.variant_ids[i] + " with value " +
+                                         std::to_string(dof(i)));
+            }
+            p(i, j) = compute_log_p_value(t(i, j), dof(i));
+        }
+    }
+}
+
+
 ResultsChunk IndirectGWAS::compute_results_chunk()
 {
     ResultsChunk results;
 
-    // Set the variant IDs, avoiding a copy
     results.variant_ids = std::move(variant_ids);
-
-    // Create a reference to gpv_sum that is called gpv_mean (to avoid ambiguity)
-    Eigen::VectorXd &gpv_mean = gpv_sum.data;
-    gpv_mean = gpv_mean.array() / n_features;
-
-    // Compute the standard error of the beta coefficients
-    results.std_error = -beta.data.array().square();
-    for (int i = 0; i < results.std_error.rows(); i++)
-    {
-        for (int j = 0; j < results.std_error.cols(); j++)
-        {
-            results.std_error(i, j) += projection_partial_variance.data(j) / gpv_mean(i);
-            results.std_error(i, j) /= degrees_of_freedom.data(i);
-        }
-    }
-    results.std_error = results.std_error.cwiseSqrt();
-
-    // Compute the t-statistic
-    results.t_statistic = beta.data.array() / results.std_error.array();
-
-    // Move beta to results, avoiding a copy
     results.beta = std::move(beta.data);
 
-    // Compute the p-value by calling compute_log_p_value on each element of the t-statistic matrix
-    results.neg_log10_p_value.resizeLike(results.t_statistic);
+    compute_standard_error(results);
 
-    for (int i = 0; i < results.t_statistic.rows(); i++)
-    {
-        for (int j = 0; j < results.t_statistic.cols(); j++)
-        {
-            if (degrees_of_freedom.data(i) <= 0 || std::isnan(degrees_of_freedom.data(i)))
-            {
-                throw std::runtime_error("Degrees of freedom is an error for variant " +
-                                         results.variant_ids[i] + " with value " +
-                                         std::to_string(degrees_of_freedom.data(i)));
-            }
-            results.neg_log10_p_value(i, j) = compute_log_p_value(results.t_statistic(i, j), degrees_of_freedom.data(i, 1));
-        }
-    }
+    // Compute the t-statistic
+    results.t_statistic = results.beta.array() / results.std_error.array();
+
+    // Compute the p-value by calling compute_log_p_value on each t-statistic
+    compute_p_value(results);
 
     // Add the sample size to the results
     results.sample_size = degrees_of_freedom.data.array() + n_covariates + 2;
@@ -255,13 +258,13 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
 
         // Open the output file
         std::string filename = output_stem + "_" + projection_name + ".csv";
-
         std::ofstream file;
         if (write_header)
         {
             file.open(filename);
 
             // Write the header
+            // IDEA: Could use the same column names as the input files
             file << "variant_id,beta,std_error,t_statistic,neg_log10_p_value,sample_size"
                  << std::endl;
         }
@@ -270,10 +273,12 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
             file.open(filename, std::ios_base::app);
         }
 
+        // IDEA: Could set precision as a parameter
+        file << std::setprecision(6);
+
         // Write the results
         for (int j = 0; j < results.variant_ids.size(); j++)
         {
-            // IDEA: Could set precision
             // IDEA: Could use other separators
             file << results.variant_ids[j] << ","
                  << results.beta(j, i) << ","

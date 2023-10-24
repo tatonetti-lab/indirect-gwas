@@ -33,9 +33,12 @@ private:
     unsigned int n_projections;
 
     // Functions
+    void ensure_names_consistent(std::vector<std::string> names_1, std::vector<std::string> names_2);
     std::unordered_map<std::string, unsigned int> get_header_indexes(std::string header_line);
     void read_file_chunk(std::string filename, unsigned int start_row, unsigned int end_row);
     void process_file_chunk(unsigned int k, std::string filename, unsigned int start_row, unsigned int end_row);
+    void compute_standard_error(ResultsChunk &results);
+    void compute_p_value(ResultsChunk &results);
     ResultsChunk compute_results_chunk();
     void save_results_chunk(ResultsChunk &results, std::string output_stem, bool write_header);
 
