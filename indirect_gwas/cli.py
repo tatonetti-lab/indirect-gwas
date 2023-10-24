@@ -163,20 +163,22 @@ def main():
 
     if not args.quiet:
         # Print start datetime in human-readable format
-        print(f"Started at {datetime.datetime.now().strftime('%c')}")
+        print(f"Started at\t{datetime.datetime.now().strftime('%c')}")
+
+    paths = [p.as_posix() for p in args.gwas_summary_statistics]
 
     _igwas.run(
-        args.gwas_summary_statistics,
+        paths,
         args.variant_id_column,
         args.coefficient_column,
         args.standard_error_column,
         args.sample_size_column,
-        args.projection_coefficients,
-        args.feature_partial_covariance,
-        args.output,
+        args.projection_coefficients.as_posix(),
+        args.feature_partial_covariance.as_posix(),
+        args.output.as_posix(),
         args.n_exogenous,
         args.chunksize,
     )
 
     if not args.quiet:
-        print(f"Finished at {datetime.datetime.now().strftime('%c')}")
+        print(f"Finished at\t{datetime.datetime.now().strftime('%c')}")

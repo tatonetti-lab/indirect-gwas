@@ -6,7 +6,7 @@ from pybind11.setup_helpers import Pybind11Extension, build_ext
 setup(
     ext_modules=[
         Pybind11Extension(
-            name="_igwas",
+            name="indirect_gwas._igwas",
             sources=sorted(glob.glob("indirect_gwas/src/*.cpp")),
             include_dirs=[
                 "indirect_gwas/src",

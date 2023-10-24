@@ -1,1 +1,1 @@
-import _igwas
+import indirect_gwas._igwas

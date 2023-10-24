@@ -206,6 +206,19 @@ void IndirectGWAS::compute_standard_error(ResultsChunk &results)
         {
             se(i, j) += projection_partial_variance.data(j) / gpv(i);
             se(i, j) /= degrees_of_freedom.data(i);
+
+            if (std::isnan(se(i, j)) || se(i, j) < 0)
+            {
+                std::cerr << "Standard error for variant "
+                          << results.variant_ids[i]
+                          << " is "
+                          << se(i, j)
+                          << ". gpv = " << gpv(i)
+                          << ", projection_partial_variance = " << projection_partial_variance.data(j)
+                          << ", degrees_of_freedom = " << degrees_of_freedom.data(i)
+                          << ", beta = " << results.beta(i, j)
+                          << std::endl;
+            }
         }
     }
     se = se.cwiseSqrt();
@@ -227,6 +240,16 @@ void IndirectGWAS::compute_p_value(ResultsChunk &results)
                 throw std::runtime_error("Degrees of freedom is an error for variant " +
                                          results.variant_ids[i] + " with value " +
                                          std::to_string(dof(i)));
+            }
+            if (std::isnan(t(i, j)))
+            {
+                // std::cerr << "T-statistic is an error for variant "
+                //           << results.variant_ids[i]
+                //           << " with value "
+                //           << t(i, j) << std::endl;
+
+                p(i, j) = std::nan("");
+                continue;
             }
             p(i, j) = compute_log_p_value(t(i, j), dof(i));
         }
@@ -309,10 +332,10 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
         // Clear the variant IDs
         variant_ids.clear();
 
-        // Initialize the chunk matrices
-        degrees_of_freedom.data.resize(this_chunksize);
-        beta.data.resize(this_chunksize, n_projections);
-        gpv_sum.data.resize(this_chunksize, n_projections);
+        // Resize and zero the matrices
+        degrees_of_freedom.data = Eigen::VectorXd::Zero(this_chunksize);
+        beta.data = Eigen::MatrixXd::Zero(this_chunksize, n_projections);
+        gpv_sum.data = Eigen::VectorXd::Zero(this_chunksize);
 
         // Iterate across all files, updating running summary statistics
         for (int i = 0; i < filenames.size(); i++)
