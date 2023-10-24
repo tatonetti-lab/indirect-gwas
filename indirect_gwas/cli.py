@@ -188,27 +188,3 @@ def main():
 
     if not args.quiet:
         print(f"Finished at {datetime.datetime.now().strftime('%c')}")
-
-
-def load_data(args):
-    if args.has_index:
-        index_col = 0
-        header = 0
-    else:
-        index_col = None
-        header = None
-
-    projection_coefficients = pd.read_csv(
-        args.projection_coefficients,
-        header=header,
-        index_col=index_col,
-        sep=args.separator,
-    )
-
-    feature_partial_covariance = pd.read_csv(
-        args.feature_partial_covariance,
-        header=header,
-        index_col=index_col,
-        sep=args.separator,
-    )
-    return projection_coefficients, feature_partial_covariance
