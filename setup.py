@@ -1,7 +1,13 @@
 import glob
+import os
+
 from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
+
+eigen_include_path = os.environ.get('EIGEN_INCLUDE_PATH', '/usr/include')
+boost_math_include_path = os.environ.get('BOOST_MATH_INCLUDE_PATH', '/usr/include')
+csv_include_path = os.environ.get('CSV_INCLUDE_PATH', '/usr/include')
 
 setup(
     ext_modules=[
@@ -10,9 +16,9 @@ setup(
             sources=sorted(glob.glob("indirect_gwas/src/*.cpp")),
             include_dirs=[
                 "indirect_gwas/src",
-                "extern/math-boost-1.83.0/include",
-                "extern/eigen-3.4.0",
-                "extern/",
+                boost_math_include_path,
+                eigen_include_path,
+                csv_include_path,
             ],
             language="c++",
         )
