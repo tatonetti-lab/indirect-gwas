@@ -57,3 +57,30 @@ unsigned int count_lines(std::string filename)
         n_lines++;
     return n_lines;
 }
+
+void head(std::string filename, unsigned int n_lines)
+{
+    csv::CSVReader reader(filename);
+
+    // Print the header
+    for (csv::CSVField &field : reader.get_col_names())
+    {
+        std::cout << field.get<std::string>() << " ";
+    }
+    std::cout << std::endl;
+
+    unsigned int row_index = 0;
+    for (csv::CSVRow &row : reader)
+    {
+        if (row_index > n_lines)
+            break;
+
+        for (csv::CSVField &field : row)
+        {
+            std::cout << field.get<std::string>() << " ";
+        }
+        std::cout << std::endl;
+
+        row_index++;
+    }
+}
