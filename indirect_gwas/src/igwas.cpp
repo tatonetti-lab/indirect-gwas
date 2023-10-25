@@ -243,6 +243,9 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
         const std::size_t bufferSize = 256 * 1024 * 1024;
         char buffer[bufferSize];
 
+        // Set the buffer to the ofstream
+        file.rdbuf()->pubsetbuf(buffer, bufferSize);
+
         if (write_header)
         {
             file.open(filename);
@@ -259,9 +262,6 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
 
         // IDEA: Could set precision as a parameter
         file << std::setprecision(6);
-
-        // Set the buffer to the ofstream
-        file.rdbuf()->pubsetbuf(buffer, bufferSize);
 
         // Write the results
         for (int j = 0; j < results.variant_ids.size(); j++)
