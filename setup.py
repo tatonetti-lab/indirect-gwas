@@ -12,6 +12,7 @@ setup(
                 "indirect_gwas/src",
                 "extern/math-boost-1.83.0/include",
                 "extern/eigen-3.4.0",
+                "extern/",
             ],
             language="c++",
         )

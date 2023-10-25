@@ -103,7 +103,6 @@ def test_cpp():
             direct_result_paths.append(path)
 
         paths = list(pathlib.Path(tmpdirname).glob("*"))
-        print("N paths produced: ", len(paths))
 
         for projection in projection_names:
             direct_df = pd.read_csv(f"{tmpdirname}/direct_{projection}.csv", index_col=0)
@@ -128,3 +127,7 @@ def test_pvalues(t, df):
     cpp_version = indirect_gwas._igwas.compute_pvalue(t, df)
     print(python_version, cpp_version)
     assert cpp_version == pytest.approx(python_version)
+
+
+if __name__ == "__main__":
+    test_cpp()
