@@ -83,4 +83,8 @@ void head(std::string filename, unsigned int n_lines)
 
         row_index++;
     }
+
+    // Print shape information
+    std::cout << "Number of rows: " << reader.n_rows() << std::endl;
+    std::cout << "Number of columns: " << reader.get_col_names().size() << std::endl;
 }
