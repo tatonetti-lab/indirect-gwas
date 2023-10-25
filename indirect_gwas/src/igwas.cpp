@@ -97,11 +97,6 @@ void IndirectGWAS::read_file_chunk(
     csv::CSVReader reader(filename);
 
     bool fill_variant_ids = variant_ids.size() == 0;
-    unsigned int n_rows = end_row - start_row;
-
-    beta_vec.resize(n_rows);
-    std_error_vec.resize(n_rows);
-    sample_size_vec.resize(n_rows);
 
     unsigned int row_index = 0;
     for (csv::CSVRow &row : reader)
@@ -111,10 +106,7 @@ void IndirectGWAS::read_file_chunk(
             row_index++;
             continue;
         }
-        if (row_index > end_row)
-        {
-            break;
-        }
+        if (row_index > end_row) break;
 
         // Populate variant IDs or check that they match
         if (fill_variant_ids)
@@ -223,10 +215,11 @@ void IndirectGWAS::compute_p_value(ResultsChunk &results)
             }
             if (std::isnan(t(i, j)))
             {
-                // std::cerr << "T-statistic is an error for variant "
-                //           << results.variant_ids[i]
-                //           << " with value "
-                //           << t(i, j) << std::endl;
+                std::cerr << "Erroneous T-statistic for variant "
+                          << results.variant_ids[i] << " with value " << t(i, j)
+                          << ". Corresponding beta is " << results.beta(i, j)
+                          << ", standard error is " << results.std_error(i, j)
+                          << std::endl;
 
                 p(i, j) = std::nan("");
                 continue;
@@ -297,6 +290,21 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
     }
 }
 
+void IndirectGWAS::reset_running_data(unsigned int chunksize)
+{
+    // Clear the variant IDs
+    variant_ids.clear();
+
+    // Resize and zero the vectors and matrices
+    beta_vec.resize(chunksize);
+    std_error_vec.resize(chunksize);
+    sample_size_vec.resize(chunksize);
+
+    degrees_of_freedom.data = Eigen::VectorXd::Zero(chunksize);
+    beta.data = Eigen::MatrixXd::Zero(chunksize, n_projections);
+    gpv_sum.data = Eigen::VectorXd::Zero(chunksize);
+}
+
 void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_stem)
 {
     // Count the number of lines to ensure appropriate chunking
@@ -307,15 +315,9 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
     while (chunk_start_line < n_lines)
     {
         unsigned int chunk_end_line = std::min(chunk_start_line + chunksize - 1, n_lines);
-        unsigned int this_chunksize = chunk_end_line - chunk_start_line;
 
-        // Clear the variant IDs
-        variant_ids.clear();
-
-        // Resize and zero the matrices
-        degrees_of_freedom.data = Eigen::VectorXd::Zero(this_chunksize);
-        beta.data = Eigen::MatrixXd::Zero(this_chunksize, n_projections);
-        gpv_sum.data = Eigen::VectorXd::Zero(this_chunksize);
+        // Reset the running data to the current chunk size and zero where necessary
+        reset_running_data(chunk_end_line - chunk_start_line);
 
         // Iterate across all files, updating running summary statistics
         for (int i = 0; i < filenames.size(); i++)

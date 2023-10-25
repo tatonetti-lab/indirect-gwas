@@ -40,6 +40,7 @@ private:
     void compute_standard_error(ResultsChunk &results);
     void compute_p_value(ResultsChunk &results);
     ResultsChunk compute_results_chunk();
+    void reset_running_data(unsigned int chunksize);
     void save_results_chunk(ResultsChunk &results, std::string output_stem, bool write_header);
 
 public:

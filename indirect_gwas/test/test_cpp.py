@@ -1,4 +1,6 @@
 import pathlib
+import shlex
+import subprocess
 import tempfile
 
 import numpy as np
@@ -33,56 +35,69 @@ def gwas(y, X, covariates, output_path):
     results_df.to_csv(output_path, index=False)
 
 
+def setup_test_data(temporary_directory):
+    raw_df = sm.datasets.get_rdataset("mtcars", "datasets", cache=True).data
+
+    projection_names = ["P1", "P2"]
+
+    # Feature phenotypes
+    Y = raw_df[["mpg", "hp"]]
+    feature_names = list(Y.columns)
+
+    # Variants
+    X = raw_df[["wt", "qsec"]]
+
+    # Covariates
+    covariates = raw_df[["cyl"]].assign(intercept=1)
+
+    # Compute the feature GWAS
+    feature_result_paths = list()
+    for feature in feature_names:
+        path = f"{temporary_directory}/{feature}.csv"
+        gwas(Y[feature], X, covariates, path)
+        feature_result_paths.append(path)
+
+    # Projection coefficients
+    beta = np.array([[1., 1.],
+                        [1.5, 0.25]])
+
+    beta_df = pd.DataFrame(beta, index=feature_names, columns=projection_names)
+    beta_df.index.name = "feature_id"
+    beta_df.to_csv(f"{temporary_directory}/projection_coefficients.csv")
+
+    # Compute the feature partial covariance
+    _feature_beta, _, _, _ = np.linalg.lstsq(covariates, Y, rcond=None)
+    _feature_beta = pd.DataFrame(_feature_beta, index=covariates.columns,
+                                    columns=feature_names)
+    feature_partial_covariance = (Y - covariates @ _feature_beta).cov()
+    try:
+        feature_partial_covariance.index = feature_names
+    except ValueError as e:
+        print(feature_names, feature_partial_covariance.shape)
+        raise e
+
+    feature_partial_covariance.columns = feature_names
+    feature_partial_covariance.index.name = "feature_id"
+    feature_partial_covariance.to_csv(f"{temporary_directory}/feature_partial_covariance.csv")
+    return dict(
+        feature_result_paths=feature_result_paths,
+        projection_names=projection_names,
+        beta_df=beta_df,
+        feature_partial_covariance=feature_partial_covariance,
+        Y=Y,
+        X=X,
+        covariates=covariates,
+    )
+
+
 def test_cpp():
     # Get the mtcars R dataset
     with tempfile.TemporaryDirectory() as tmpdirname:
-        raw_df = sm.datasets.get_rdataset("mtcars", "datasets", cache=True).data
-
-        projection_names = ["P1", "P2"]
-
-        # Feature phenotypes
-        Y = raw_df[["mpg", "hp"]]
-        feature_names = list(Y.columns)
-
-        # Variants
-        X = raw_df[["wt", "qsec"]]
-
-        # Covariates
-        covariates = raw_df[["cyl"]].assign(intercept=1)
-
-        # Compute the feature GWAS
-        feature_result_paths = list()
-        for feature in feature_names:
-            path = f"{tmpdirname}/{feature}.csv"
-            gwas(Y[feature], X, covariates, path)
-            feature_result_paths.append(path)
-
-        # Projection coefficients
-        beta = np.array([[1., 1.],
-                         [1.5, 0.25]])
-
-        beta_df = pd.DataFrame(beta, index=feature_names, columns=projection_names)
-        beta_df.index.name = "feature_id"
-        beta_df.to_csv(f"{tmpdirname}/projection_coefficients.csv")
-
-        # Compute the feature partial covariance
-        _feature_beta, _, _, _ = np.linalg.lstsq(covariates, Y, rcond=None)
-        _feature_beta = pd.DataFrame(_feature_beta, index=covariates.columns,
-                                     columns=feature_names)
-        feature_partial_covariance = (Y - covariates @ _feature_beta).cov()
-        try:
-            feature_partial_covariance.index = feature_names
-        except ValueError as e:
-            print(feature_names, feature_partial_covariance.shape)
-            raise e
-
-        feature_partial_covariance.columns = feature_names
-        feature_partial_covariance.index.name = "feature_id"
-        feature_partial_covariance.to_csv(f"{tmpdirname}/feature_partial_covariance.csv")
+        data = setup_test_data(tmpdirname)
 
         # Compute the indirect GWAS
         indirect_gwas._igwas.run(
-            feature_result_paths,
+            data["feature_result_paths"],
             "variant_id",
             "beta",
             "std_error",
@@ -96,15 +111,15 @@ def test_cpp():
 
         # Compute the direct GWAS
         direct_result_paths = list()
-        projection_df = pd.concat([Y @ beta_df, covariates], axis=1)
-        for projection in projection_names:
+        projection_df = pd.concat([data["Y"] @ data["beta_df"], data["covariates"]], axis=1)
+        for projection in data["projection_names"]:
             path = f"{tmpdirname}/direct_{projection}.csv"
-            gwas(projection_df[projection], X, covariates, path)
+            gwas(projection_df[projection], data["X"], data["covariates"], path)
             direct_result_paths.append(path)
 
-        paths = list(pathlib.Path(tmpdirname).glob("*"))
+        paths = list(pathlib.Path(tmpdirname).glob("indirect*"))
 
-        for projection in projection_names:
+        for projection in data["projection_names"]:
             direct_df = pd.read_csv(f"{tmpdirname}/direct_{projection}.csv", index_col=0)
             indirect_df = pd.read_csv(f"{tmpdirname}/indirect_{projection}.csv", index_col=0)
 
@@ -112,7 +127,53 @@ def test_cpp():
             for col in direct_df.columns:
                 assert indirect_df[col].values == pytest.approx(direct_df[col].values, rel=1e-4)
 
-    print("SUCCESS")
+    print(f"SUCCESS! Direct use produced {len(paths)} paths")
+
+
+def test_cpp_cli():
+    # Get the mtcars R dataset
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        data = setup_test_data(tmpdirname)
+
+        # Compute the indirect GWAS
+        result = subprocess.run(shlex.split(f"""
+                indirect-gwas
+                -P {tmpdirname}/projection_coefficients.csv
+                -C {tmpdirname}/feature_partial_covariance.csv
+                --variant-id-column variant_id
+                --coefficient-column beta
+                --standard-error-column std_error
+                --sample-size-column sample_size
+                --number-of-exogenous 1
+                --chunksize 10
+                --gwas-summary-statistics {" ".join(data["feature_result_paths"])}
+                --output {tmpdirname}/indirect
+                """
+        ))
+
+        if not result.returncode == 0:
+            print(result.stdout)
+            print(result.stderr)
+
+        # Compute the direct GWAS
+        direct_result_paths = list()
+        projection_df = pd.concat([data["Y"] @ data["beta_df"], data["covariates"]], axis=1)
+        for projection in data["projection_names"]:
+            path = f"{tmpdirname}/direct_{projection}.csv"
+            gwas(projection_df[projection], data["X"], data["covariates"], path)
+            direct_result_paths.append(path)
+
+        paths = list(pathlib.Path(tmpdirname).glob("indirect*"))
+
+        for projection in data["projection_names"]:
+            direct_df = pd.read_csv(f"{tmpdirname}/direct_{projection}.csv", index_col=0)
+            indirect_df = pd.read_csv(f"{tmpdirname}/indirect_{projection}.csv", index_col=0)
+
+            # Use pytest to check that all the columns are approximately equal
+            for col in direct_df.columns:
+                assert indirect_df[col].values == pytest.approx(direct_df[col].values, rel=1e-4)
+
+    print(f"SUCCESS! CLI use produced {len(paths)} paths")
 
 
 @pytest.mark.parametrize("t,df", [(0, 1), (1, 30), (1.5, 50), (-0.0696064, 29),
@@ -131,3 +192,4 @@ def test_pvalues(t, df):
 
 if __name__ == "__main__":
     test_cpp()
+    test_cpp_cli()
