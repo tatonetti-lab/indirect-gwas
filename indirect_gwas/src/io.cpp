@@ -1,5 +1,13 @@
 #include "io.hpp"
 
+#include <fstream>
+#include <string>
+#include <vector>
+
+#include <csv.hpp>
+
+#include "utils.hpp"
+
 LabeledMatrix read_input_matrix(std::string filename)
 {
     csv::CSVReader reader(filename);
@@ -41,9 +49,11 @@ LabeledMatrix read_input_matrix(std::string filename)
 unsigned int count_lines(std::string filename)
 {
     std::ifstream file(filename);
-    if (!file.is_open()) throw std::runtime_error("Error: could not open file");
+    if (!file.is_open())
+        throw std::runtime_error("Error: could not open file");
     unsigned int n_lines = 0;
     std::string line;
-    while (std::getline(file, line)) n_lines++;
+    while (std::getline(file, line))
+        n_lines++;
     return n_lines;
 }

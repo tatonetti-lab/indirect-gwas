@@ -1,8 +1,12 @@
 #pragma once
 
-#include <algorithm>
-#include <unordered_map>
+#include <string>
+#include <vector>
+
+#include <Eigen/Dense>
+
 #include "io.hpp"
+#include "utils.hpp"
 
 class IndirectGWAS
 {

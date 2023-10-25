@@ -1,7 +1,12 @@
+#include <string>
+#include <vector>
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 #include "igwas.hpp"
+#include "io.hpp"
+#include "utils.hpp"
 
 namespace py = pybind11;
 
@@ -29,15 +34,9 @@ void run_analysis(
 
 PYBIND11_MODULE(_igwas, m)
 {
-    // m.doc() = "pybind11 example plugin"; // optional module docstring
     m.def(
         "run",
         &run_analysis,
-        // "run(feature_gwas_summary_filenames : list[str], variant_id_column : str, "
-        // "beta_column : str, std_error_column : str, sample_size_column : str, "
-        // "projection_coefficients_filename : str, "
-        // "feature_partial_covariance_filename : str, "
-        // "output_stem : str, n_covariates : int, chunksize : int) -> None\n\n"
         "Runs indirect GWAS using the C++ backend.\n\n"
         "Parameters\n----------\n"
         "feature_gwas_summary_filenames : list[str]\n"
@@ -79,8 +78,6 @@ PYBIND11_MODULE(_igwas, m)
         py::arg("feature_partial_covariance_filename"),
         py::arg("output_stem"),
         py::arg("n_covariates"),
-        py::arg("chunksize")
-    );
-    m.def("compute_pvalue", &compute_log_p_value, "Compute p-value");
-    m.def("read_csv", &read_input_matrix, "Read CSV file");
+        py::arg("chunksize"));
+    m.def("compute_pvalue", &compute_log_p_value, "Compute negative log10 p-value");
 }

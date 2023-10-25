@@ -1,5 +1,19 @@
 #include "igwas.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#include <csv.hpp>
+#include <Eigen/Dense>
+
+#include "io.hpp"
+#include "utils.hpp"
+
 IndirectGWAS::IndirectGWAS(
     ColumnSpec column_names,
     LabeledMatrix projection_coefficients,
@@ -72,7 +86,8 @@ void IndirectGWAS::read_file_chunk(
             row_index++;
             continue;
         }
-        if (row_index > end_row) break;
+        if (row_index > end_row)
+            break;
 
         // Populate variant IDs or check that they match
         if (fill_variant_ids)

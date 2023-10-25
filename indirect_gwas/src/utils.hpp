@@ -1,8 +1,9 @@
-#include <boost/math/distributions/students_t.hpp>
-#include <Eigen/Dense>
+#pragma once
+
 #include <string>
 #include <vector>
-#include <cmath>
+
+#include <Eigen/Dense>
 
 // Create a struct to store the columns to read
 struct ColumnSpec
