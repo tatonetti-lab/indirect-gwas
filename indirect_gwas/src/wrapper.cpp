@@ -35,5 +35,4 @@ PYBIND11_MODULE(_igwas, m)
     m.def("run", &run_analysis, "Run igwas");  // TODO: Add arguments and types
     m.def("compute_pvalue", &compute_log_p_value, "Compute p-value");
     m.def("read_csv", &read_input_matrix, "Read CSV file");
-    m.def("read_vec", &read_input_vector, "Read vector");
 }
