@@ -238,6 +238,11 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
         // Open the output file
         std::string filename = output_stem + "_" + projection_name + ".csv";
         std::ofstream file;
+
+        // Allocate a buffer of size 256 MB
+        const std::size_t bufferSize = 256 * 1024 * 1024;
+        char buffer[bufferSize];
+
         if (write_header)
         {
             file.open(filename);
@@ -254,10 +259,6 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
 
         // IDEA: Could set precision as a parameter
         file << std::setprecision(6);
-
-        // Allocate a buffer of size 1MB (for instance)
-        const std::size_t bufferSize = 256 * 1024 * 1024;
-        char buffer[bufferSize];
 
         // Set the buffer to the ofstream
         file.rdbuf()->pubsetbuf(buffer, bufferSize);
