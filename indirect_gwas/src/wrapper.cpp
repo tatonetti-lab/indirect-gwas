@@ -20,8 +20,8 @@ void run_analysis(
 {
     IndirectGWAS igwas_obj{
         ColumnSpec{variant_id_column, beta_column, std_error_column, sample_size_column},
-        projection_coefficients_filename,
-        feature_partial_covariance_filename,
+        read_input_matrix(projection_coefficients_filename),
+        read_input_matrix(feature_partial_covariance_filename),
         n_covariates,
         chunksize
     };

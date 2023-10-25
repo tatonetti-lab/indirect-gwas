@@ -2,17 +2,14 @@
 
 IndirectGWAS::IndirectGWAS(
     ColumnSpec column_names,
-    std::string projection_coefficients_filename,
-    std::string feature_partial_covariance_filename,
+    LabeledMatrix projection_coefficients,
+    LabeledMatrix feature_partial_covariance,
     const unsigned int n_covariates,
     const unsigned int chunksize) : column_names(column_names),
                                     n_covariates(n_covariates),
                                     chunksize(chunksize),
-                                    projection_coefficients(read_input_matrix(projection_coefficients_filename))
+                                    projection_coefficients(projection_coefficients)
 {
-    // Load the full feature partial covariance matrix
-    LabeledMatrix feature_partial_covariance = read_input_matrix(feature_partial_covariance_filename);
-
     auto &projection_names = projection_coefficients.column_names;
     auto &feature_names = feature_partial_covariance.row_names;
 
@@ -97,24 +94,17 @@ void IndirectGWAS::read_file_chunk(
     unsigned int start_row,
     unsigned int end_row)
 {
-    // Read the file
-    std::ifstream file(filename);
-    if (!file.is_open())
-        throw std::runtime_error("Error: could not open file " + filename);
+    csv::CSVReader reader(filename);
 
-    // Read the header line
-    std::string line;
-    std::getline(file, line);
-    auto header_index = get_header_indexes(line);
-
-    // Read the data into vectors
     bool fill_variant_ids = variant_ids.size() == 0;
     unsigned int n_rows = end_row - start_row;
+
     beta_vec.resize(n_rows);
     std_error_vec.resize(n_rows);
     sample_size_vec.resize(n_rows);
+
     unsigned int row_index = 0;
-    while (std::getline(file, line))
+    for (csv::CSVRow &row : reader)
     {
         if (row_index < start_row)
         {
@@ -122,34 +112,24 @@ void IndirectGWAS::read_file_chunk(
             continue;
         }
         if (row_index > end_row)
-            break;
-
-        // TODO: Could greatly optimize this by not reading the entire line
-        std::istringstream iss(line);
-        std::vector<std::string> data;
-        std::string datum;
-        while (std::getline(iss, datum, ','))
         {
-            data.push_back(datum);
+            break;
         }
 
         // Populate variant IDs or check that they match
         if (fill_variant_ids)
         {
-            variant_ids.push_back(data[header_index[column_names.variant_id]]);
+            variant_ids.push_back(row[column_names.variant_id].get<std::string>());
         }
-        else
+        else if (variant_ids[row_index - start_row] != row[column_names.variant_id].get<std::string>())
         {
-            if (variant_ids[row_index - start_row] != data[header_index[column_names.variant_id]])
-            {
-                throw std::runtime_error("Error: variant IDs do not match between files");
-            }
+            throw std::runtime_error("Error: variant IDs do not match between files");
         }
 
         // Populate the data vectors
-        beta_vec(row_index - start_row) = std::stod(data[header_index[column_names.beta]]);
-        std_error_vec(row_index - start_row) = std::stod(data[header_index[column_names.se]]);
-        sample_size_vec(row_index - start_row) = std::stoi(data[header_index[column_names.sample_size]]);
+        beta_vec(row_index - start_row) = row[column_names.beta].get<double>();
+        std_error_vec(row_index - start_row) = row[column_names.se].get<double>();
+        sample_size_vec(row_index - start_row) = row[column_names.sample_size].get<int>();
         row_index++;
     }
 }

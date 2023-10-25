@@ -45,8 +45,8 @@ private:
 public:
     IndirectGWAS(
         ColumnSpec column_names,
-        std::string projection_coefficients_filename,
-        std::string feature_partial_covariance_filename,
+        LabeledMatrix projection_coefficients,
+        LabeledMatrix feature_partial_covariance,
         const unsigned int n_covariates,
         const unsigned int chunksize);
     ~IndirectGWAS(){};
