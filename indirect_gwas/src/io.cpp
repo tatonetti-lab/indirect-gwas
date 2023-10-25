@@ -63,9 +63,9 @@ void head(std::string filename, unsigned int n_lines)
     csv::CSVReader reader(filename);
 
     // Print the header
-    for (csv::CSVField &field : reader.get_col_names())
+    for (auto &field : reader.get_col_names())
     {
-        std::cout << field.get<std::string>() << " ";
+        std::cout << field << " ";
     }
     std::cout << std::endl;
 
