@@ -55,40 +55,6 @@ void IndirectGWAS::ensure_names_consistent(std::vector<std::string> names_1,
     }
 }
 
-std::unordered_map<std::string, unsigned int> IndirectGWAS::get_header_indexes(std::string header_line)
-{
-    std::istringstream iss(header_line);
-    std::unordered_map<std::string, unsigned int> results;
-    int i = 0;
-    std::string header;
-    while (std::getline(iss, header, ','))
-    {
-        if (header == column_names.variant_id ||
-            header == column_names.beta ||
-            header == column_names.se ||
-            header == column_names.sample_size)
-        {
-            results[header] = i;
-        }
-
-        i++;
-    }
-
-    // Check that all four columns were found. If not, print some details and throw an error.
-    if (results.size() != 4)
-    {
-        std::cerr << "Error: could not find all four columns in the header line" << std::endl;
-        std::cerr << "Header line: " << header_line << std::endl;
-        std::cerr << "Variant ID column: " << column_names.variant_id << std::endl;
-        std::cerr << "Beta column: " << column_names.beta << std::endl;
-        std::cerr << "Standard error column: " << column_names.se << std::endl;
-        std::cerr << "Sample size column: " << column_names.sample_size << std::endl;
-        throw std::runtime_error("Error: could not find all four columns in the header line");
-    }
-
-    return results;
-}
-
 void IndirectGWAS::read_file_chunk(
     std::string filename,
     unsigned int start_row,
@@ -182,14 +148,12 @@ void IndirectGWAS::compute_standard_error(ResultsChunk &results)
             if (std::isnan(se(i, j)) || se(i, j) < 0)
             {
                 std::cerr << "Standard error for variant "
-                          << results.variant_ids[i]
-                          << " is "
-                          << se(i, j)
+                          << results.variant_ids[i] << " is " << se(i, j)
                           << ". gpv = " << gpv(i)
-                          << ", projection_partial_variance = " << projection_partial_variance.data(j)
+                          << ", projection_partial_variance = "
+                          << projection_partial_variance.data(j)
                           << ", degrees_of_freedom = " << degrees_of_freedom.data(i)
-                          << ", beta = " << results.beta(i, j)
-                          << std::endl;
+                          << ", beta = " << results.beta(i, j) << std::endl;
             }
         }
     }
@@ -290,6 +254,7 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
     }
 }
 
+// Resets running data containers to the current chunk size and zeros where necessary
 void IndirectGWAS::reset_running_data(unsigned int chunksize)
 {
     // Clear the variant IDs
@@ -305,6 +270,8 @@ void IndirectGWAS::reset_running_data(unsigned int chunksize)
     gpv_sum.data = Eigen::VectorXd::Zero(chunksize);
 }
 
+// Runs the indirect GWAS. Assumes that all input files are identically formatted,
+// with the same column names and identical variants in the same order.
 void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_stem)
 {
     // Count the number of lines to ensure appropriate chunking
@@ -317,7 +284,7 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
         unsigned int chunk_end_line = std::min(chunk_start_line + chunksize - 1, n_lines);
 
         // Reset the running data to the current chunk size and zero where necessary
-        reset_running_data(chunk_end_line - chunk_start_line);
+        reset_running_data(chunk_end_line - chunk_start_line + 1);
 
         // Iterate across all files, updating running summary statistics
         for (int i = 0; i < filenames.size(); i++)

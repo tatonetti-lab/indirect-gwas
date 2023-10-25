@@ -157,7 +157,7 @@ def test_cpp():
             f"{tmpdirname}/feature_partial_covariance.csv",
             f"{tmpdirname}/indirect",
             1,
-            10,
+            2,
         )
 
         paths = compare_direct_vs_indirect(tmpdirname, data)
