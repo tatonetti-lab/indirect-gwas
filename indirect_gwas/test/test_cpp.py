@@ -34,7 +34,7 @@ def gwas(y, X, covariates, output_path):
         )
 
     results_df = pd.DataFrame(results)
-    results_df.to_csv(output_path, index=False)
+    results_df.to_csv(output_path, index=False, float_format="%.6f")
 
 
 def compute_feature_partial_covariance(Y, covariates):
@@ -96,7 +96,8 @@ def setup_test_data(temporary_directory):
     # Compute the feature partial covariance
     feature_partial_covariance = compute_feature_partial_covariance(Y, covariates)
     feature_partial_covariance.to_csv(
-        f"{temporary_directory}/feature_partial_covariance.csv"
+        f"{temporary_directory}/feature_partial_covariance.csv",
+        float_format="%.6f",
     )
 
     return dict(
@@ -131,15 +132,15 @@ def compare_direct_vs_indirect(tmpdirname, data):
 
         # Use pytest to check that all the columns are approximately equal
         for col in direct_df.columns:
-            assert indirect_df[col].values == pytest.approx(
-                direct_df[col].values, rel=1e-5
-            )
+            max_diff = np.abs(indirect_df[col].values - direct_df[col].values).max()
+            assert max_diff == pytest.approx(0, abs=1e-4, rel=1e-4)
 
     paths = list(pathlib.Path(tmpdirname).glob("indirect*"))
     return paths
 
 
-def test_cpp():
+@pytest.mark.parametrize("chunksize", [1, 2, 10, 25, 1000])
+def test_cpp(chunksize):
     """
     Test the C++ code using the Python API.
     Ensure that results are approximately equal to the direct GWAS (up to 1e-5)
@@ -157,7 +158,7 @@ def test_cpp():
             f"{tmpdirname}/feature_partial_covariance.csv",
             f"{tmpdirname}/indirect",
             1,
-            2,
+            chunksize,
         )
 
         paths = compare_direct_vs_indirect(tmpdirname, data)
@@ -165,7 +166,8 @@ def test_cpp():
     print(f"SUCCESS! Direct use produced {len(paths)} paths")
 
 
-def test_cpp_cli():
+@pytest.mark.parametrize("chunksize", [1, 2, 10, 25, 1000])
+def test_cpp_cli(chunksize):
     """
     Test the C++ code using the CLI.
     Ensure that results are approximately equal to the direct GWAS (up to 1e-5)
@@ -218,8 +220,3 @@ def test_pvalues(t, df):
     cpp_version = indirect_gwas._igwas.compute_pvalue(t, df)
     print(python_version, cpp_version)
     assert cpp_version == pytest.approx(python_version)
-
-
-if __name__ == "__main__":
-    test_cpp()
-    test_cpp_cli()

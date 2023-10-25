@@ -123,8 +123,8 @@ void IndirectGWAS::process_file_chunk(
     }
 
     // Update the sum of genotype partial variances
-    Eigen::VectorXd denominator = new_dof.array() * std_error_vec.array().square() + beta_vec.array().square();
-    gpv_sum.data += (denominator.cwiseInverse() * feature_partial_variance.data[k]);
+    Eigen::VectorXd denom = new_dof.array() * std_error_vec.array().square() + beta_vec.array().square();
+    gpv_sum.data += (denom.cwiseInverse() * feature_partial_variance.data[k]);
 }
 
 // Split the standard error computation into a separate function for readability
@@ -281,7 +281,7 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
     unsigned int chunk_start_line = 0;
     while (chunk_start_line < n_lines)
     {
-        unsigned int chunk_end_line = std::min(chunk_start_line + chunksize - 1, n_lines);
+        unsigned int chunk_end_line = std::min(chunk_start_line + chunksize - 1, n_lines - 1);
 
         // Reset the running data to the current chunk size and zero where necessary
         reset_running_data(chunk_end_line - chunk_start_line + 1);

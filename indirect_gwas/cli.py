@@ -3,7 +3,7 @@ import datetime
 import pathlib
 import textwrap
 
-import _igwas
+import indirect_gwas._igwas
 
 
 def parse_args():
@@ -52,7 +52,7 @@ def parse_args():
         "--gwas-summary-statistics",
         type=pathlib.Path,
         required=True,
-        nargs="+",
+        nargs="*",
         help="""Path(s) to GWAS summary statistics for the feature phenotypes.
             Separate files with spaces. File name stems will be treated as the feature
             names. Can include wildcards like 'path/to/files/*.csv.gz'. The variant
@@ -167,7 +167,7 @@ def main():
 
     paths = [p.as_posix() for p in args.gwas_summary_statistics]
 
-    _igwas.run(
+    indirect_gwas._igwas.run(
         paths,
         args.variant_id_column,
         args.coefficient_column,

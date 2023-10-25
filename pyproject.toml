@@ -20,3 +20,9 @@ test = ["pytest", "statsmodels", "flake8", "pandas", "scipy"]
 [project.scripts]
 indirect-gwas = "indirect_gwas.cli:main"
 compute-feature-partial-covariance = "indirect_gwas.cli:compute_feature_partial_covariance"
+
+[tool.pytest.ini_options]
+pythonpath = "src"
+addopts = [
+    "--import-mode=importlib",
+]
