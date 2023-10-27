@@ -316,14 +316,9 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
 
 void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
 {
-    // Buffer sizes
-    // const std::size_t fileBufferSize = 1024 * 1024 * 150;
-
     // Open the output file
     std::string filename = output_stem + ".csv";
     std::ofstream file;
-    // char fileBuffer[fileBufferSize];
-    // file.rdbuf()->pubsetbuf(fileBuffer, fileBufferSize);
 
     if (write_header)
     {
@@ -336,8 +331,7 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
         file.open(filename, std::ios_base::app);
     }
 
-    // IDEA: Could set precision as a parameter
-    // file << std::setprecision(6);
+    std::ios_base::sync_with_stdio(false);
 
     std::stringstream ss;
     ss << std::setprecision(6);
@@ -355,11 +349,12 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
                << results.std_error(vid, pid) << ","
                << results.t_statistic(vid, pid) << ","
                << results.neg_log10_p_value(vid, pid) << ","
-               << results.sample_size(vid) << std::endl;
+               << results.sample_size(vid) << "\n";
         }
     }
-    std::cout << "Writing string stream to file" << std::endl;
-    file.write(ss.str().c_str(), ss.str().size());
+    std::cout << "Writing string to file" << std::endl;
+    std::string file_contents = ss.str();
+    file << file_contents;
 }
 
 // Resets running data containers to the current chunk size and zeros where necessary
