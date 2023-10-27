@@ -146,7 +146,6 @@ def compare_direct_vs_indirect_multiple_files(tmpdirname, data):
     direct_result_paths = list()
     projection_df = pd.concat([data["Y"] @ data["beta_df"], data["covariates"]], axis=1)
 
-    full_results_df = pd.DataFrame()
     for projection in data["projection_names"]:
         results_df = gwas(projection_df[projection], data["X"], data["covariates"])
 
@@ -242,7 +241,7 @@ def test_cpp_cli(chunksize, single_file_output, num_files):
                 --standard-error-column std_error
                 --sample-size-column sample_size
                 --number-of-exogenous 1
-                --chunksize 10
+                --chunksize {chunksize}
                 --gwas-summary-statistics {" ".join(data["feature_result_paths"])}
                 --output {tmpdirname}/indirect
                 {'--single-file-output' if single_file_output else ''}
