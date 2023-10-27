@@ -1,6 +1,7 @@
 #include "igwas.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
@@ -340,19 +341,26 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
 
     // Open the output file
     std::string filename = output_stem + ".csv";
-    std::ofstream file;
+
+    auto start = std::chrono::high_resolution_clock::now();
 
     if (write_header)
     {
-        file.open(filename);
+        std::ofstream file(filename);
         file << "projection_id,variant_id,beta,std_error,t_statistic,"
              << "neg_log10_p_value,sample_size" << std::endl;
+        file << oss.str();
     }
     else
     {
-        file.open(filename, std::ios_base::app);
+        std::ofstream file(filename, std::ios_base::app);
+        file << oss.str();
     }
-    file << oss.str();
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::ofstream timefile("time.txt");
+    timefile << "Time taken to write data: " << elapsed.count() << " seconds" << std::endl;
 }
 
 // Resets running data containers to the current chunk size and zeros where necessary
