@@ -317,15 +317,13 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
 void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
 {
     // Buffer sizes
-    const std::size_t fileBufferSize = 1024 * 1024 * 4;  // 4MB buffer for ofstream
-    const std::size_t stringStreamSize = 1024 * 1024 * 50;  // reserve 50MB for ostringstream
+    // const std::size_t fileBufferSize = 1024 * 1024 * 150;
 
     // Open the output file
     std::string filename = output_stem + ".csv";
     std::ofstream file;
-
-    char fileBuffer[fileBufferSize];
-    file.rdbuf()->pubsetbuf(fileBuffer, fileBufferSize);
+    // char fileBuffer[fileBufferSize];
+    // file.rdbuf()->pubsetbuf(fileBuffer, fileBufferSize);
 
     if (write_header)
     {
@@ -339,14 +337,10 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
     }
 
     // IDEA: Could set precision as a parameter
-    file << std::setprecision(6);
+    // file << std::setprecision(6);
 
-    // Use ostringstream to accumulate data
-    std::ostringstream oss;
-    std::string buffer;
-    buffer.reserve(stringStreamSize);
-    oss.str(buffer);
-    oss << std::setprecision(6);
+    std::stringstream ss;
+    ss << std::setprecision(6);
 
     int vidSize = results.variant_ids.size();
     int pidSize = results.beta.cols();
@@ -355,29 +349,16 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
     {
         for (int pid = 0; pid < pidSize; pid++)
         {
-            oss << projection_coefficients.column_names[pid] << ","
-                << results.variant_ids[vid] << ","
-                << results.beta(vid, pid) << ","
-                << results.std_error(vid, pid) << ","
-                << results.t_statistic(vid, pid) << ","
-                << results.neg_log10_p_value(vid, pid) << ","
-                << results.sample_size(vid) << std::endl;
-        }
-
-        // If the string buffer grows large, dump it to file
-        if (oss.tellp() > static_cast<std::streampos>(stringStreamSize - 1024 * 1024))  // leave 1MB room
-        {
-            file << oss.str();
-            oss.str("");
-            oss.clear();
+            ss << projection_coefficients.column_names[pid] << ","
+               << results.variant_ids[vid] << ","
+               << results.beta(vid, pid) << ","
+               << results.std_error(vid, pid) << ","
+               << results.t_statistic(vid, pid) << ","
+               << results.neg_log10_p_value(vid, pid) << ","
+               << results.sample_size(vid) << std::endl;
         }
     }
-
-    // Write any remaining data to the file
-    if (!oss.str().empty())
-    {
-        file << oss.str();
-    }
+    file.write(ss.str().c_str(), ss.str().size());
 }
 
 // Resets running data containers to the current chunk size and zeros where necessary
