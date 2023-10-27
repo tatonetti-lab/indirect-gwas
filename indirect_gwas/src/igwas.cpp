@@ -316,6 +316,28 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
 
 void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
 {
+    std::ios_base::sync_with_stdio(false);
+
+    std::ostringstream oss;
+    oss.precision(6);
+
+    int vidSize = results.variant_ids.size();
+    int pidSize = results.beta.cols();
+
+    for (int vid = 0; vid < vidSize; vid++)
+    {
+        for (int pid = 0; pid < pidSize; pid++)
+        {
+            oss << projection_coefficients.column_names[pid] << ","
+                << results.variant_ids[vid] << ","
+                << results.beta(vid, pid) << ","
+                << results.std_error(vid, pid) << ","
+                << results.t_statistic(vid, pid) << ","
+                << results.neg_log10_p_value(vid, pid) << ","
+                << results.sample_size(vid) << "\n";
+        }
+    }
+
     // Open the output file
     std::string filename = output_stem + ".csv";
     std::ofstream file;
@@ -330,31 +352,7 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
     {
         file.open(filename, std::ios_base::app);
     }
-
-    std::ios_base::sync_with_stdio(false);
-
-    std::stringstream ss;
-    ss << std::setprecision(6);
-
-    int vidSize = results.variant_ids.size();
-    int pidSize = results.beta.cols();
-
-    for (int vid = 0; vid < vidSize; vid++)
-    {
-        for (int pid = 0; pid < pidSize; pid++)
-        {
-            ss << projection_coefficients.column_names[pid] << ","
-               << results.variant_ids[vid] << ","
-               << results.beta(vid, pid) << ","
-               << results.std_error(vid, pid) << ","
-               << results.t_statistic(vid, pid) << ","
-               << results.neg_log10_p_value(vid, pid) << ","
-               << results.sample_size(vid) << "\n";
-        }
-    }
-    std::cout << "Writing string to file" << std::endl;
-    std::string file_contents = ss.str();
-    file << file_contents;
+    file << oss.str();
 }
 
 // Resets running data containers to the current chunk size and zeros where necessary
