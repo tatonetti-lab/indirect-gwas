@@ -273,48 +273,6 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
     }
 }
 
-// Exactly the same as save_results_chunk, except that it writes to a single file,
-// with an additional column for the projection name.
-// void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
-// {
-//     // Open the output file
-//     std::string filename = output_stem + ".csv";
-//     std::ofstream file;
-
-//     if (write_header)
-//     {
-//         file.open(filename);
-
-//         // Write the header
-//         // IDEA: Could use the same column names as the input files
-//         file << "projection_id,variant_id,beta,std_error,t_statistic,"
-//              << "neg_log10_p_value,sample_size" << std::endl;
-//     }
-//     else
-//     {
-//         file.open(filename, std::ios_base::app);
-//     }
-
-//     // IDEA: Could set precision as a parameter
-//     file << std::setprecision(6);
-
-//     // Write the results
-//     for (int vid = 0; vid < results.variant_ids.size(); vid++)
-//     {
-//         for (int pid = 0; pid < results.beta.cols(); pid++)
-//         {
-//             // IDEA: Could use other separators
-//             file << projection_coefficients.column_names[pid] << ","
-//                  << results.variant_ids[vid] << ","
-//                  << results.beta(vid, pid) << ","
-//                  << results.std_error(vid, pid) << ","
-//                  << results.t_statistic(vid, pid) << ","
-//                  << results.neg_log10_p_value(vid, pid) << ","
-//                  << results.sample_size(vid) << std::endl;
-//         }
-//     }
-// }
-
 void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
 {
     std::ios_base::sync_with_stdio(false);
@@ -341,26 +299,20 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
 
     // Open the output file
     std::string filename = output_stem + ".csv";
-
-    auto start = std::chrono::high_resolution_clock::now();
+    std::ofstream file;
 
     if (write_header)
     {
-        std::ofstream file(filename);
+        file.open(filename);
         file << "projection_id,variant_id,beta,std_error,t_statistic,"
              << "neg_log10_p_value,sample_size" << std::endl;
-        file << oss.str();
     }
     else
     {
-        std::ofstream file(filename, std::ios_base::app);
-        file << oss.str();
+        file.open(filename, std::ios_base::app);
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    std::ofstream timefile("time.txt");
-    timefile << "Time taken to write data: " << elapsed.count() << " seconds" << std::endl;
+    file << oss.str();
 }
 
 // Resets running data containers to the current chunk size and zeros where necessary
@@ -383,8 +335,19 @@ void IndirectGWAS::reset_running_data(unsigned int chunksize)
 // with the same column names and identical variants in the same order.
 void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_stem)
 {
+    // Create a log file for the run
+    std::ofstream logfile(output_stem + ".log");
+
+    // Add the start time to the log file
+    auto start = std::chrono::high_resolution_clock::now();
+    logfile << "Start time: "
+            << std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())
+            << std::endl;
+
     // Count the number of lines to ensure appropriate chunking
+    logfile << "Counting lines in " << filenames[0] << std::endl;
     unsigned int n_lines = count_lines(filenames[0]) - 1;
+    logfile << "Number of lines: " << n_lines << std::endl;
 
     // Iterate across all chunks
     unsigned int chunk_start_line = 0;
@@ -392,17 +355,26 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
     {
         unsigned int chunk_end_line = std::min(chunk_start_line + chunksize - 1, n_lines - 1);
 
+        logfile << "Processing lines " << chunk_start_line << " to " << chunk_end_line << std::endl;
+
         // Reset the running data to the current chunk size and zero where necessary
         reset_running_data(chunk_end_line - chunk_start_line + 1);
 
         // Iterate across all files, updating running summary statistics
         for (int i = 0; i < filenames.size(); i++)
         {
+            logfile << "Processing file " << i + 1 << "/" << filenames.size()
+                    << ": " << filenames[i] << std::endl;
+
             process_file_chunk(i, filenames[i], chunk_start_line, chunk_end_line);
         }
 
+        logfile << "Finished reading files for this chunk" << std::endl;
+
         // Compute the final results for this chunk
         ResultsChunk results = compute_results_chunk();
+
+        logfile << "Finished computing final results for this chunk" << std::endl;
 
         // Save the results for this chunk
         if (single_file_output)
@@ -414,7 +386,20 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
             save_results_chunk(results, output_stem, chunk_start_line == 0);
         }
 
+        logfile << "Saved results for this chunk" << std::endl;
+
         // Update the chunk start line
         chunk_start_line = chunk_end_line + 1;
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+
+    // Add the end time to the log file
+    logfile << "End time: "
+            << std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())
+            << std::endl;
+
+    // Add elapsed time
+    std::chrono::duration<double> elapsed = end - start;
+    logfile << "Time taken: " << elapsed.count() << " seconds" << std::endl;
 }

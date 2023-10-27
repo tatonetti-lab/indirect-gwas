@@ -138,7 +138,7 @@ def compare_direct_vs_indirect_single_file(tmpdirname, data):
                             comparison_df[col].values).max()
         assert max_diff == pytest.approx(0, abs=1e-4, rel=1e-4)
 
-    paths = list(pathlib.Path(tmpdirname).glob("indirect*"))
+    paths = list(pathlib.Path(tmpdirname).glob("indirect*csv"))
     return paths
 
 
@@ -175,7 +175,7 @@ def compare_direct_vs_indirect_multiple_files(tmpdirname, data):
                               comparison_df[col].values).max()
             assert max_diff == pytest.approx(0, abs=1e-4, rel=1e-4)
 
-    paths = list(pathlib.Path(tmpdirname).glob("indirect*"))
+    paths = list(pathlib.Path(tmpdirname).glob("indirect*csv"))
     return paths
 
 
