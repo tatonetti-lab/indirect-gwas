@@ -83,7 +83,7 @@ PYBIND11_MODULE(_igwas, m)
         py::arg("output_stem"),
         py::arg("n_covariates"),
         py::arg("chunksize"),
-        py::arg("single_file_output") = false);
+        py::arg("single_file_output"));
     m.def("compute_pvalue", &compute_log_p_value, "Compute negative log10 p-value");
     m.def("head", &head, "Print the first n lines of a file", py::arg("filename"), py::arg("n_lines"));
 }
