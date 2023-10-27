@@ -358,6 +358,7 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
                << results.sample_size(vid) << std::endl;
         }
     }
+    std::cout << "Writing string stream to file" << std::endl;
     file.write(ss.str().c_str(), ss.str().size());
 }
 
