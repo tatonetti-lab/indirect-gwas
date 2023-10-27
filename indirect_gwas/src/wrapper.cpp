@@ -20,14 +20,16 @@ void run_analysis(
     std::string feature_partial_covariance_filename,
     std::string output_stem,
     const unsigned int n_covariates,
-    const unsigned int chunksize)
+    const unsigned int chunksize,
+    bool single_file_output)
 {
     IndirectGWAS igwas_obj{
         ColumnSpec{variant_id_column, beta_column, std_error_column, sample_size_column},
         read_input_matrix(projection_coefficients_filename),
         read_input_matrix(feature_partial_covariance_filename),
         n_covariates,
-        chunksize};
+        chunksize,
+        single_file_output};
 
     igwas_obj.run(feature_gwas_summary_filenames, output_stem);
 }
@@ -66,7 +68,9 @@ PYBIND11_MODULE(_igwas, m)
         "n_covariates : int\n"
         "    Number of covariates used in the feature GWAS.\n"
         "chunksize : int\n"
-        "    Number of rows to read from feature GWAS summary files at a time.\n\n"
+        "    Number of rows to read from feature GWAS summary files at a time.\n"
+        "single_file_output : bool\n"
+        "    Whether to write all results to a single file.\n\n"
         "Returns\n-------\n"
         "None\n\n",
         py::arg("feature_gwas_summary_filenames"),
@@ -78,7 +82,8 @@ PYBIND11_MODULE(_igwas, m)
         py::arg("feature_partial_covariance_filename"),
         py::arg("output_stem"),
         py::arg("n_covariates"),
-        py::arg("chunksize"));
+        py::arg("chunksize"),
+        py::arg("single_file_output") = false);
     m.def("compute_pvalue", &compute_log_p_value, "Compute negative log10 p-value");
     m.def("head", &head, "Print the first n lines of a file", py::arg("filename"), py::arg("n_lines"));
 }

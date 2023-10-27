@@ -12,10 +12,9 @@ import statsmodels.api as sm
 import indirect_gwas
 
 
-def gwas(y, X, covariates, output_path):
+def gwas(y, X, covariates):
     """
     Run regressions on each feature in X against y, controlling for covariates.
-    Save results to output_path.
     """
     exog_df = pd.concat([X, covariates], axis=1)
 
@@ -34,7 +33,7 @@ def gwas(y, X, covariates, output_path):
         )
 
     results_df = pd.DataFrame(results)
-    results_df.to_csv(output_path, index=False, float_format="%.6f")
+    return results_df
 
 
 def compute_feature_partial_covariance(Y, covariates):
@@ -84,7 +83,8 @@ def setup_test_data(temporary_directory):
     feature_result_paths = list()
     for feature in feature_names:
         path = f"{temporary_directory}/{feature}.csv"
-        gwas(Y[feature], X, covariates, path)
+        results_df = gwas(Y[feature], X, covariates)
+        results_df.to_csv(path, index=False, float_format="%.6f")
         feature_result_paths.append(path)
 
     # Projection coefficients
@@ -111,36 +111,88 @@ def setup_test_data(temporary_directory):
     )
 
 
-def compare_direct_vs_indirect(tmpdirname, data):
-    """
-    Compare the direct and indirect GWAS results.
-    Ensure that results are approximately equal (up to 1e-5)
-    """
-    # Compute the direct GWAS
+def compare_direct_vs_indirect_single_file(tmpdirname, data):
+    projection_df = pd.concat([data["Y"] @ data["beta_df"], data["covariates"]], axis=1)
+
+    direct_df = pd.DataFrame()
+    for projection in data["projection_names"]:
+        results_df = gwas(projection_df[projection], data["X"], data["covariates"])
+        results_df["projection_id"] = projection
+        direct_df = pd.concat([direct_df, results_df], axis=0)
+
+    indirect_df = pd.read_csv(f"{tmpdirname}/indirect.csv")
+
+    direct_df["variant_id"] = direct_df["variant_id"].astype(str)
+    indirect_df["variant_id"] = indirect_df["variant_id"].astype(str)
+
+    # Join the two dataframes
+    comparison_df = direct_df.merge(indirect_df, on=["variant_id", "projection_id"],
+                                    suffixes=("", "_indirect"))
+
+    # Use pytest to check that all the columns are approximately equal
+    for col in direct_df.columns:
+        if col in ["variant_id", "projection_id"]:
+            continue
+
+        max_diff = np.abs(comparison_df[f"{col}_indirect"].values -
+                            comparison_df[col].values).max()
+        assert max_diff == pytest.approx(0, abs=1e-4, rel=1e-4)
+
+    paths = list(pathlib.Path(tmpdirname).glob("indirect*"))
+    return paths
+
+
+def compare_direct_vs_indirect_multiple_files(tmpdirname, data):
     direct_result_paths = list()
     projection_df = pd.concat([data["Y"] @ data["beta_df"], data["covariates"]], axis=1)
+
+    full_results_df = pd.DataFrame()
     for projection in data["projection_names"]:
+        results_df = gwas(projection_df[projection], data["X"], data["covariates"])
+
         path = f"{tmpdirname}/direct_{projection}.csv"
-        gwas(projection_df[projection], data["X"], data["covariates"], path)
+        results_df.to_csv(path, index=False, float_format="%.6f")
+
         direct_result_paths.append(path)
 
     for projection in data["projection_names"]:
-        direct_df = pd.read_csv(f"{tmpdirname}/direct_{projection}.csv", index_col=0)
-        indirect_df = pd.read_csv(
-            f"{tmpdirname}/indirect_{projection}.csv", index_col=0
-        )
+        direct_df = pd.read_csv(f"{tmpdirname}/direct_{projection}.csv")
+        indirect_df = pd.read_csv(f"{tmpdirname}/indirect_{projection}.csv")
+
+        # Join the two dataframes
+        direct_df["variant_id"] = direct_df["variant_id"].astype(str)
+        indirect_df["variant_id"] = indirect_df["variant_id"].astype(str)
+
+        comparison_df = direct_df.merge(indirect_df, on=["variant_id"],
+                                        suffixes=("", "_indirect"))
 
         # Use pytest to check that all the columns are approximately equal
         for col in direct_df.columns:
-            max_diff = np.abs(indirect_df[col].values - direct_df[col].values).max()
+            if col in ["variant_id", "projection_id"]:
+                continue
+
+            max_diff = np.abs(comparison_df[f"{col}_indirect"].values -
+                              comparison_df[col].values).max()
             assert max_diff == pytest.approx(0, abs=1e-4, rel=1e-4)
 
     paths = list(pathlib.Path(tmpdirname).glob("indirect*"))
     return paths
 
 
+def compare_direct_vs_indirect(tmpdirname, data, single_file_output=False):
+    """
+    Compare the direct and indirect GWAS results.
+    Ensure that results are approximately equal (up to 1e-5)
+    """
+    if single_file_output:
+        return compare_direct_vs_indirect_single_file(tmpdirname, data)
+    else:
+        return compare_direct_vs_indirect_multiple_files(tmpdirname, data)
+
+
 @pytest.mark.parametrize("chunksize", [1, 2, 10, 25, 1000])
-def test_cpp(chunksize):
+@pytest.mark.parametrize("single_file_output, num_files", [(True, 1), (False, 2)])
+def test_cpp(chunksize, single_file_output, num_files):
     """
     Test the C++ code using the Python API.
     Ensure that results are approximately equal to the direct GWAS (up to 1e-5)
@@ -159,15 +211,19 @@ def test_cpp(chunksize):
             f"{tmpdirname}/indirect",
             1,
             chunksize,
+            single_file_output,
         )
 
-        paths = compare_direct_vs_indirect(tmpdirname, data)
+        paths = compare_direct_vs_indirect(tmpdirname, data, single_file_output)
+
+        assert len(paths) == num_files
 
     print(f"SUCCESS! Direct use produced {len(paths)} paths")
 
 
 @pytest.mark.parametrize("chunksize", [1, 2, 10, 25, 1000])
-def test_cpp_cli(chunksize):
+@pytest.mark.parametrize("single_file_output, num_files", [(True, 1), (False, 2)])
+def test_cpp_cli(chunksize, single_file_output, num_files):
     """
     Test the C++ code using the CLI.
     Ensure that results are approximately equal to the direct GWAS (up to 1e-5)
@@ -189,6 +245,7 @@ def test_cpp_cli(chunksize):
                 --chunksize 10
                 --gwas-summary-statistics {" ".join(data["feature_result_paths"])}
                 --output {tmpdirname}/indirect
+                {'--single-file-output' if single_file_output else ''}
                 """
             )
         )
@@ -197,7 +254,9 @@ def test_cpp_cli(chunksize):
             print(result.stdout)
             print(result.stderr)
 
-        paths = compare_direct_vs_indirect(tmpdirname, data)
+        paths = compare_direct_vs_indirect(tmpdirname, data, single_file_output)
+
+        assert len(paths) == num_files
 
     print(f"SUCCESS! CLI use produced {len(paths)} paths")
 

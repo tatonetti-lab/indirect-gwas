@@ -19,10 +19,12 @@ IndirectGWAS::IndirectGWAS(
     LabeledMatrix projection_coefficients,
     LabeledMatrix feature_partial_covariance,
     const unsigned int n_covariates,
-    const unsigned int chunksize) : column_names(column_names),
-                                    n_covariates(n_covariates),
-                                    chunksize(chunksize),
-                                    projection_coefficients(projection_coefficients)
+    const unsigned int chunksize,
+    bool single_file_output) : column_names(column_names),
+                               n_covariates(n_covariates),
+                               chunksize(chunksize),
+                               projection_coefficients(projection_coefficients),
+                               single_file_output(single_file_output)
 {
     auto &projection_names = projection_coefficients.column_names;
     auto &feature_names = feature_partial_covariance.row_names;
@@ -270,6 +272,48 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
     }
 }
 
+// Exactly the same as save_results_chunk, except that it writes to a single file,
+// with an additional column for the projection name.
+void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
+{
+    // Open the output file
+    std::string filename = output_stem + ".csv";
+    std::ofstream file;
+
+    if (write_header)
+    {
+        file.open(filename);
+
+        // Write the header
+        // IDEA: Could use the same column names as the input files
+        file << "projection_id,variant_id,beta,std_error,t_statistic,"
+             << "neg_log10_p_value,sample_size" << std::endl;
+    }
+    else
+    {
+        file.open(filename, std::ios_base::app);
+    }
+
+    // IDEA: Could set precision as a parameter
+    file << std::setprecision(6);
+
+    // Write the results
+    for (int vid = 0; vid < results.variant_ids.size(); vid++)
+    {
+        for (int pid = 0; pid < results.beta.cols(); pid++)
+        {
+            // IDEA: Could use other separators
+            file << projection_coefficients.column_names[pid] << ","
+                 << results.variant_ids[vid] << ","
+                 << results.beta(vid, pid) << ","
+                 << results.std_error(vid, pid) << ","
+                 << results.t_statistic(vid, pid) << ","
+                 << results.neg_log10_p_value(vid, pid) << ","
+                 << results.sample_size(vid) << std::endl;
+        }
+    }
+}
+
 // Resets running data containers to the current chunk size and zeros where necessary
 void IndirectGWAS::reset_running_data(unsigned int chunksize)
 {
@@ -312,7 +356,14 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
         ResultsChunk results = compute_results_chunk();
 
         // Save the results for this chunk
-        save_results_chunk(results, output_stem, chunk_start_line == 0);
+        if (single_file_output)
+        {
+            save_results_single_file(results, output_stem, chunk_start_line == 0);
+        }
+        else
+        {
+            save_results_chunk(results, output_stem, chunk_start_line == 0);
+        }
 
         // Update the chunk start line
         chunk_start_line = chunk_end_line + 1;

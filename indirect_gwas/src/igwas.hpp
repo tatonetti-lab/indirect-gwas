@@ -17,6 +17,7 @@ private:
     // Parameters
     const unsigned int n_covariates;
     const unsigned int chunksize;
+    bool single_file_output;
 
     // Input data
     LabeledMatrix projection_coefficients;
@@ -45,6 +46,7 @@ private:
     ResultsChunk compute_results_chunk();
     void reset_running_data(unsigned int chunksize);
     void save_results_chunk(ResultsChunk &results, std::string output_stem, bool write_header);
+    void save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header);
 
 public:
     IndirectGWAS(
@@ -52,7 +54,8 @@ public:
         LabeledMatrix projection_coefficients,
         LabeledMatrix feature_partial_covariance,
         const unsigned int n_covariates,
-        const unsigned int chunksize);
+        const unsigned int chunksize,
+        bool single_file_output);
     ~IndirectGWAS(){};
     void run(std::vector<std::string> filenames, std::string output_stem);
 };

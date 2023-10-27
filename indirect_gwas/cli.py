@@ -139,6 +139,13 @@ def parse_args():
         help="""Number of rows to read at a time. This can be used to reduce memory usage.""",
     )
 
+    parser.add_argument(
+        "--single-file-output",
+        action="store_true",
+        help="""Whether to write all projections to a single file. If this flag is not
+            set, a separate file will be created for each projection.""",
+    )
+
     # parser.add_argument(
     #     "--computation-dtype",
     #     type=str,
@@ -178,6 +185,7 @@ def main():
         args.output.as_posix(),
         args.n_exogenous,
         args.chunksize,
+        args.single_file_output,
     )
 
     if not args.quiet:
