@@ -274,18 +274,62 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
 
 // Exactly the same as save_results_chunk, except that it writes to a single file,
 // with an additional column for the projection name.
+// void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
+// {
+//     // Open the output file
+//     std::string filename = output_stem + ".csv";
+//     std::ofstream file;
+
+//     if (write_header)
+//     {
+//         file.open(filename);
+
+//         // Write the header
+//         // IDEA: Could use the same column names as the input files
+//         file << "projection_id,variant_id,beta,std_error,t_statistic,"
+//              << "neg_log10_p_value,sample_size" << std::endl;
+//     }
+//     else
+//     {
+//         file.open(filename, std::ios_base::app);
+//     }
+
+//     // IDEA: Could set precision as a parameter
+//     file << std::setprecision(6);
+
+//     // Write the results
+//     for (int vid = 0; vid < results.variant_ids.size(); vid++)
+//     {
+//         for (int pid = 0; pid < results.beta.cols(); pid++)
+//         {
+//             // IDEA: Could use other separators
+//             file << projection_coefficients.column_names[pid] << ","
+//                  << results.variant_ids[vid] << ","
+//                  << results.beta(vid, pid) << ","
+//                  << results.std_error(vid, pid) << ","
+//                  << results.t_statistic(vid, pid) << ","
+//                  << results.neg_log10_p_value(vid, pid) << ","
+//                  << results.sample_size(vid) << std::endl;
+//         }
+//     }
+// }
+
 void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
 {
+    // Buffer sizes
+    const std::size_t fileBufferSize = 1024 * 1024 * 4;  // 4MB buffer for ofstream
+    const std::size_t stringStreamSize = 1024 * 1024 * 50;  // reserve 50MB for ostringstream
+
     // Open the output file
     std::string filename = output_stem + ".csv";
     std::ofstream file;
 
+    char fileBuffer[fileBufferSize];
+    file.rdbuf()->pubsetbuf(fileBuffer, fileBufferSize);
+
     if (write_header)
     {
         file.open(filename);
-
-        // Write the header
-        // IDEA: Could use the same column names as the input files
         file << "projection_id,variant_id,beta,std_error,t_statistic,"
              << "neg_log10_p_value,sample_size" << std::endl;
     }
@@ -297,20 +341,42 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
     // IDEA: Could set precision as a parameter
     file << std::setprecision(6);
 
-    // Write the results
-    for (int vid = 0; vid < results.variant_ids.size(); vid++)
+    // Use ostringstream to accumulate data
+    std::ostringstream oss;
+    std::string buffer;
+    buffer.reserve(stringStreamSize);
+    oss.str(buffer);
+    oss << std::setprecision(6);
+
+    int vidSize = results.variant_ids.size();
+    int pidSize = results.beta.cols();
+
+    for (int vid = 0; vid < vidSize; vid++)
     {
-        for (int pid = 0; pid < results.beta.cols(); pid++)
+        for (int pid = 0; pid < pidSize; pid++)
         {
-            // IDEA: Could use other separators
-            file << projection_coefficients.column_names[pid] << ","
-                 << results.variant_ids[vid] << ","
-                 << results.beta(vid, pid) << ","
-                 << results.std_error(vid, pid) << ","
-                 << results.t_statistic(vid, pid) << ","
-                 << results.neg_log10_p_value(vid, pid) << ","
-                 << results.sample_size(vid) << std::endl;
+            oss << projection_coefficients.column_names[pid] << ","
+                << results.variant_ids[vid] << ","
+                << results.beta(vid, pid) << ","
+                << results.std_error(vid, pid) << ","
+                << results.t_statistic(vid, pid) << ","
+                << results.neg_log10_p_value(vid, pid) << ","
+                << results.sample_size(vid) << std::endl;
         }
+
+        // If the string buffer grows large, dump it to file
+        if (oss.tellp() > static_cast<std::streampos>(stringStreamSize - 1024 * 1024))  // leave 1MB room
+        {
+            file << oss.str();
+            oss.str("");
+            oss.clear();
+        }
+    }
+
+    // Write any remaining data to the file
+    if (!oss.str().empty())
+    {
+        file << oss.str();
     }
 }
 
