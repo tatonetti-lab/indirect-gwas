@@ -253,17 +253,30 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
     std::ostringstream oss(std::move(str));
     oss.precision(6);
 
+    // Do some pre-computation to avoid repeated calls to std::to_string
+    std::vector<std::string> projection_names = projection_coefficients.column_names;
+    for (int pid = 0; pid < pidSize; pid++)
+        projection_names[pid] += ",";
+
+    std::vector<std::string> variant_ids = results.variant_ids;
+    for (int vid = 0; vid < vidSize; vid++)
+        variant_ids[vid] += ",";
+
+    std::vector<std::string> sample_size(vidSize);
+    for (int vid = 0; vid < vidSize; vid++)
+        sample_size[vid] = "," + std::to_string(results.sample_size(vid)) + "\n";
+
     for (int vid = 0; vid < vidSize; vid++)
     {
         for (int pid = 0; pid < pidSize; pid++)
         {
-            oss << projection_coefficients.column_names[pid] << ","
-                << results.variant_ids[vid] << ","
+            oss << projection_names[pid]
+                << variant_ids[vid]
                 << results.beta(vid, pid) << ","
                 << results.std_error(vid, pid) << ","
                 << results.t_statistic(vid, pid) << ","
-                << results.neg_log10_p_value(vid, pid) << ","
-                << results.sample_size(vid) << "\n";
+                << results.neg_log10_p_value(vid, pid)
+                << sample_size[vid];
         }
     }
     // Open the output file
