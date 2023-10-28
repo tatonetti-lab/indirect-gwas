@@ -88,3 +88,46 @@ void head(std::string filename, unsigned int n_lines)
     std::cout << "Number of rows: " << row_index << std::endl;
     std::cout << "Number of columns: " << reader.get_col_names().size() << std::endl;
 }
+
+FeatureGwasResults read_gwas_chunk(
+    std::string filename,
+    ColumnSpec column_names,
+    unsigned int start_line,
+    unsigned int end_line,
+    unsigned int n_covariates)
+{
+    unsigned int n_lines = end_line - start_line + 1;
+    FeatureGwasResults results(n_lines);
+
+    csv::CSVReader reader(filename);
+
+    unsigned int row_index = 0;
+    unsigned int idx;
+    for (csv::CSVRow &row : reader)
+    {
+        if (row_index < start_line)
+        {
+            row_index++;
+            continue;
+        }
+        if (row_index > end_line)
+            break;
+
+        idx = row_index - start_line;
+
+        // Populate variant IDs or check that they match
+        results.variant_ids[idx] = row[column_names.variant_id].get<std::string>();
+
+        // Populate the data Eigen::VectorXds
+        results.beta(idx) = row[column_names.beta].get<double>();
+        results.std_error(idx) = row[column_names.se].get<double>();
+        results.degrees_of_freedom(idx) = row[column_names.sample_size].get<double>();
+
+        row_index++;
+    }
+
+    // Adjust degrees of freedom for the number of covariates
+    results.degrees_of_freedom = results.degrees_of_freedom.array() - n_covariates - 2;
+
+    return results;
+}

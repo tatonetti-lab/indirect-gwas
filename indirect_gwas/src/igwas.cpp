@@ -6,6 +6,11 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <sstream>
+#include <thread>
 #include <string>
 #include <vector>
 
@@ -72,63 +77,19 @@ void IndirectGWAS::ensure_names_consistent(std::vector<std::string> names_1,
     }
 }
 
-void IndirectGWAS::read_file_chunk(
-    std::string filename,
-    unsigned int start_row,
-    unsigned int end_row)
+void IndirectGWAS::process_file_chunk(unsigned int k, FeatureGwasResults &results)
 {
-    csv::CSVReader reader(filename);
-
-    bool fill_variant_ids = variant_ids.size() == 0;
-
-    unsigned int row_index = 0;
-    for (csv::CSVRow &row : reader)
-    {
-        if (row_index < start_row)
-        {
-            row_index++;
-            continue;
-        }
-        if (row_index > end_row)
-            break;
-
-        // Populate variant IDs or check that they match
-        if (fill_variant_ids)
-        {
-            variant_ids.push_back(row[column_names.variant_id].get<std::string>());
-        }
-        else if (variant_ids[row_index - start_row] != row[column_names.variant_id].get<std::string>())
-        {
-            throw std::runtime_error("Error: variant IDs do not match between files");
-        }
-
-        // Populate the data vectors
-        beta_vec(row_index - start_row) = row[column_names.beta].get<double>();
-        std_error_vec(row_index - start_row) = row[column_names.se].get<double>();
-        sample_size_vec(row_index - start_row) = row[column_names.sample_size].get<int>();
-        row_index++;
-    }
-}
-
-void IndirectGWAS::process_file_chunk(
-    unsigned int k, std::string filename,
-    unsigned int start_row,
-    unsigned int end_row)
-{
-    // Read the data
-    read_file_chunk(filename, start_row, end_row);
-
-    // Update the degrees of freedom as the minimum of the current degrees of freedom
-    // and the current (sample size - number of exogenous variables - 1).
-    // Note that the number of exogenous is n_covariates + 1.
-    Eigen::VectorXd new_dof = sample_size_vec.array() - n_covariates - 2;
     if (k == 0)
     {
-        degrees_of_freedom.data = new_dof;
+        variant_ids = results.variant_ids;
+        degrees_of_freedom.data = results.degrees_of_freedom;
     }
     else
     {
-        degrees_of_freedom.data = degrees_of_freedom.data.cwiseMin(new_dof);
+        // Check that the variant IDs match
+        ensure_names_consistent(variant_ids, results.variant_ids);
+        // Update the degrees of freedom
+        degrees_of_freedom.data = degrees_of_freedom.data.cwiseMin(results.degrees_of_freedom);
     }
 
     // Update the beta matrix
@@ -136,12 +97,16 @@ void IndirectGWAS::process_file_chunk(
     {
         for (int j = 0; j < projection_coefficients.row_names.size(); j++)
         {
-            beta.data(i, j) += beta_vec(i) * projection_coefficients.data(k, j);
+            beta.data(i, j) += results.beta(i) * projection_coefficients.data(k, j);
         }
     }
 
     // Update the sum of genotype partial variances
-    Eigen::VectorXd denom = new_dof.array() * std_error_vec.array().square() + beta_vec.array().square();
+    Eigen::VectorXd &dof = results.degrees_of_freedom;
+    Eigen::VectorXd &se = results.std_error;
+    Eigen::VectorXd &b = results.beta;
+
+    Eigen::VectorXd denom = dof.array() * se.array().square() + b.array().square();
     gpv_sum.data += (denom.cwiseInverse() * feature_partial_variance.data[k]);
 }
 
@@ -321,14 +286,57 @@ void IndirectGWAS::reset_running_data(unsigned int chunksize)
     // Clear the variant IDs
     variant_ids.clear();
 
-    // Resize and zero the vectors and matrices
-    beta_vec.resize(chunksize);
-    std_error_vec.resize(chunksize);
-    sample_size_vec.resize(chunksize);
-
     degrees_of_freedom.data = Eigen::VectorXd::Zero(chunksize);
     beta.data = Eigen::MatrixXd::Zero(chunksize, n_projections);
     gpv_sum.data = Eigen::VectorXd::Zero(chunksize);
+}
+
+void IndirectGWAS::load_chunk(std::vector<std::string> filenames, unsigned int chunk_start, unsigned int chunk_end)
+{
+    finished_reading = false;
+    std::thread producer_thread(&IndirectGWAS::raw_results_producer, this, filenames,
+                                chunk_start, chunk_end);
+    std::thread consumer_thread(&IndirectGWAS::raw_results_consumer, this);
+
+    producer_thread.join();
+    consumer_thread.join();
+}
+
+void IndirectGWAS::raw_results_producer(
+    std::vector<std::string> filenames,
+    unsigned int chunk_start,
+    unsigned int chunk_end)
+{
+    for (unsigned int i = 0; i < filenames.size(); i++)
+    {
+        FeatureGwasResults results = read_gwas_chunk(
+            filenames[i], column_names, chunk_start, chunk_end, n_covariates);
+
+        {
+            std::lock_guard<std::mutex> lock(results_mutex);
+            results_queue.push({i, results});
+        }
+        cv.notify_one();
+    }
+    finished_reading = true;
+    cv.notify_all();
+}
+
+void IndirectGWAS::raw_results_consumer()
+{
+    while (true)
+    {
+        std::unique_lock<std::mutex> lock(results_mutex);
+        cv.wait(lock, [this] { return !results_queue.empty() || finished_reading; });
+
+        if (results_queue.empty() && finished_reading) break;
+
+        IndexedGwasChunk chunk = results_queue.front();
+        results_queue.pop();
+        lock.unlock();
+
+        process_file_chunk(chunk.feature_index, chunk.results);
+    }
 }
 
 // Runs the indirect GWAS. Assumes that all input files are identically formatted,
@@ -361,13 +369,7 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
         reset_running_data(chunk_end_line - chunk_start_line + 1);
 
         // Iterate across all files, updating running summary statistics
-        for (int i = 0; i < filenames.size(); i++)
-        {
-            logfile << "Processing file " << i + 1 << "/" << filenames.size()
-                    << ": " << filenames[i] << std::endl;
-
-            process_file_chunk(i, filenames[i], chunk_start_line, chunk_end_line);
-        }
+        load_chunk(filenames, chunk_start_line, chunk_end_line);
 
         logfile << "Finished reading files for this chunk" << std::endl;
 
