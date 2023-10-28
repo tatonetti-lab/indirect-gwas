@@ -240,13 +240,18 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
 
 void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
 {
-    std::ios_base::sync_with_stdio(false);
-
-    std::ostringstream oss;
-    oss.precision(6);
-
     int vidSize = results.variant_ids.size();
     int pidSize = results.beta.cols();
+
+    std::ios_base::sync_with_stdio(false);
+
+    // Preallocate a string to hold the results. Expect ballpark 70 characters per line
+    // and number of lines equal to the number of variants times the number of projections
+    std::string str;
+    str.reserve(70 * vidSize * pidSize);
+
+    std::ostringstream oss(std::move(str));
+    oss.precision(6);
 
     for (int vid = 0; vid < vidSize; vid++)
     {
@@ -261,7 +266,6 @@ void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string o
                 << results.sample_size(vid) << "\n";
         }
     }
-
     // Open the output file
     std::string filename = output_stem + ".csv";
     std::ofstream file;
