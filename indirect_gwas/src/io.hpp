@@ -10,16 +10,16 @@
 struct FeatureGwasResults
 {
     std::vector<std::string> variant_ids;
-    Eigen::VectorXd beta;
-    Eigen::VectorXd std_error;
-    Eigen::VectorXd degrees_of_freedom;
+    Eigen::VectorXf beta;
+    Eigen::VectorXf std_error;
+    Eigen::VectorXf degrees_of_freedom;
 
     FeatureGwasResults(unsigned int length)
     {
         variant_ids = std::vector<std::string>(length);
-        beta = Eigen::VectorXd(length);
-        std_error = Eigen::VectorXd(length);
-        degrees_of_freedom = Eigen::VectorXd(length);
+        beta = Eigen::VectorXf(length);
+        std_error = Eigen::VectorXf(length);
+        degrees_of_freedom = Eigen::VectorXf(length);
     };
 };
 

@@ -51,9 +51,9 @@ IndirectGWAS::IndirectGWAS(
     n_projections = projection_names.size();
 
     // Initialize the chunk matrices
-    degrees_of_freedom = {Eigen::VectorXd::Zero(0), variant_ids};
-    beta = {Eigen::MatrixXd::Zero(0, n_projections), variant_ids, projection_names};
-    gpv_sum = {Eigen::VectorXd::Zero(0), variant_ids};
+    degrees_of_freedom = {Eigen::VectorXf::Zero(0), variant_ids};
+    beta = {Eigen::MatrixXf::Zero(0, n_projections), variant_ids, projection_names};
+    gpv_sum = {Eigen::VectorXf::Zero(0), variant_ids};
 }
 
 void IndirectGWAS::ensure_names_consistent(std::vector<std::string> names_1,
@@ -102,11 +102,11 @@ void IndirectGWAS::process_file_chunk(unsigned int k, FeatureGwasResults &result
     }
 
     // Update the sum of genotype partial variances
-    Eigen::VectorXd &dof = results.degrees_of_freedom;
-    Eigen::VectorXd &se = results.std_error;
-    Eigen::VectorXd &b = results.beta;
+    Eigen::VectorXf &dof = results.degrees_of_freedom;
+    Eigen::VectorXf &se = results.std_error;
+    Eigen::VectorXf &b = results.beta;
 
-    Eigen::VectorXd denom = dof.array() * se.array().square() + b.array().square();
+    Eigen::VectorXf denom = dof.array() * se.array().square() + b.array().square();
     gpv_sum.data += (denom.cwiseInverse() * feature_partial_variance.data[k]);
 }
 
@@ -114,11 +114,11 @@ void IndirectGWAS::process_file_chunk(unsigned int k, FeatureGwasResults &result
 void IndirectGWAS::compute_standard_error(ResultsChunk &results)
 {
     // Create a reference to gpv_sum that is called gpv_mean (to avoid ambiguity)
-    Eigen::VectorXd &gpv = gpv_sum.data;
+    Eigen::VectorXf &gpv = gpv_sum.data;
     gpv /= n_features;
 
     // Reference to the standard error matrix
-    Eigen::MatrixXd &se = results.std_error;
+    Eigen::MatrixXf &se = results.std_error;
 
     se = -results.beta.array().square();
     for (int i = 0; i < se.rows(); i++)
@@ -145,9 +145,9 @@ void IndirectGWAS::compute_standard_error(ResultsChunk &results)
 
 void IndirectGWAS::compute_p_value(ResultsChunk &results)
 {
-    Eigen::MatrixXd &t = results.t_statistic;
-    Eigen::VectorXd &dof = degrees_of_freedom.data;
-    Eigen::MatrixXd &p = results.neg_log10_p_value;
+    Eigen::MatrixXf &t = results.t_statistic;
+    Eigen::VectorXf &dof = degrees_of_freedom.data;
+    Eigen::MatrixXf &p = results.neg_log10_p_value;
 
     p.resizeLike(t);
     for (int i = 0; i < t.rows(); i++)
@@ -286,9 +286,9 @@ void IndirectGWAS::reset_running_data(unsigned int chunksize)
     // Clear the variant IDs
     variant_ids.clear();
 
-    degrees_of_freedom.data = Eigen::VectorXd::Zero(chunksize);
-    beta.data = Eigen::MatrixXd::Zero(chunksize, n_projections);
-    gpv_sum.data = Eigen::VectorXd::Zero(chunksize);
+    degrees_of_freedom.data = Eigen::VectorXf::Zero(chunksize);
+    beta.data = Eigen::MatrixXf::Zero(chunksize, n_projections);
+    gpv_sum.data = Eigen::VectorXf::Zero(chunksize);
 }
 
 void IndirectGWAS::load_chunk(std::vector<std::string> filenames, unsigned int chunk_start, unsigned int chunk_end)

@@ -277,4 +277,4 @@ def test_pvalues(t, df):
     python_version = -1 * (scipy.stats.t.logsf(np.abs(t), df) + np.log(2)) / np.log(10)
     cpp_version = indirect_gwas._igwas.compute_pvalue(t, df)
     print(python_version, cpp_version)
-    assert cpp_version == pytest.approx(python_version)
+    assert cpp_version == pytest.approx(python_version, abs=1e-4, rel=1e-4)

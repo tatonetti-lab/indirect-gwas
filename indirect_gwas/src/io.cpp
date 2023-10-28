@@ -16,11 +16,11 @@ LabeledMatrix read_input_matrix(std::string filename)
     result.column_names = reader.get_col_names();
     result.column_names.erase(result.column_names.begin());
 
-    std::vector<std::vector<double>> temp_data;
+    std::vector<std::vector<float>> temp_data;
     for (csv::CSVRow &row : reader)
     {
         bool first_col = true;
-        std::vector<double> temp_row;
+        std::vector<float> temp_row;
         for (csv::CSVField &field : row)
         {
             if (first_col)
@@ -29,7 +29,7 @@ LabeledMatrix read_input_matrix(std::string filename)
                 first_col = false;
                 continue;
             }
-            temp_row.push_back(field.get<double>());
+            temp_row.push_back(field.get<float>());
         }
         temp_data.push_back(temp_row);
     }
@@ -118,10 +118,10 @@ FeatureGwasResults read_gwas_chunk(
         // Populate variant IDs or check that they match
         results.variant_ids[idx] = row[column_names.variant_id].get<std::string>();
 
-        // Populate the data Eigen::VectorXds
-        results.beta(idx) = row[column_names.beta].get<double>();
-        results.std_error(idx) = row[column_names.se].get<double>();
-        results.degrees_of_freedom(idx) = row[column_names.sample_size].get<double>();
+        // Populate the data Eigen::Vectors
+        results.beta(idx) = row[column_names.beta].get<float>();
+        results.std_error(idx) = row[column_names.se].get<float>();
+        results.degrees_of_freedom(idx) = row[column_names.sample_size].get<float>();
 
         row_index++;
     }
