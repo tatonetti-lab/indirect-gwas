@@ -240,45 +240,28 @@ void IndirectGWAS::save_results_chunk(ResultsChunk &results, std::string output_
 
 void IndirectGWAS::save_results_single_file(ResultsChunk &results, std::string output_stem, bool write_header)
 {
-    int vidSize = results.variant_ids.size();
-    int pidSize = results.beta.cols();
-
     std::ios_base::sync_with_stdio(false);
 
-    // Preallocate a string to hold the results. Expect ballpark 70 characters per line
-    // and number of lines equal to the number of variants times the number of projections
-    std::string str;
-    str.reserve(70 * vidSize * pidSize);
-
-    std::ostringstream oss(std::move(str));
+    std::ostringstream oss;
     oss.precision(6);
 
-    // Do some pre-computation to avoid repeated calls to std::to_string
-    std::vector<std::string> projection_names = projection_coefficients.column_names;
-    for (int pid = 0; pid < pidSize; pid++)
-        projection_names[pid] += ",";
-
-    std::vector<std::string> variant_ids = results.variant_ids;
-    for (int vid = 0; vid < vidSize; vid++)
-        variant_ids[vid] += ",";
-
-    std::vector<std::string> sample_size(vidSize);
-    for (int vid = 0; vid < vidSize; vid++)
-        sample_size[vid] = "," + std::to_string(results.sample_size(vid)) + "\n";
+    int vidSize = results.variant_ids.size();
+    int pidSize = results.beta.cols();
 
     for (int vid = 0; vid < vidSize; vid++)
     {
         for (int pid = 0; pid < pidSize; pid++)
         {
-            oss << projection_names[pid]
-                << variant_ids[vid]
+            oss << projection_coefficients.column_names[pid] << ","
+                << results.variant_ids[vid] << ","
                 << results.beta(vid, pid) << ","
                 << results.std_error(vid, pid) << ","
                 << results.t_statistic(vid, pid) << ","
-                << results.neg_log10_p_value(vid, pid)
-                << sample_size[vid];
+                << results.neg_log10_p_value(vid, pid) << ","
+                << results.sample_size(vid) << "\n";
         }
     }
+
     // Open the output file
     std::string filename = output_stem + ".csv";
     std::ofstream file;
