@@ -40,3 +40,5 @@ struct ResultsChunk
 };
 
 double compute_log_p_value(double t_statistic, unsigned int degrees_of_freedom);
+
+std::string get_formatted_time();

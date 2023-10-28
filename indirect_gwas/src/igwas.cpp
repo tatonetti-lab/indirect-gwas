@@ -348,9 +348,7 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
 
     // Add the start time to the log file
     auto start = std::chrono::high_resolution_clock::now();
-    logfile << "Start time: "
-            << std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())
-            << std::endl;
+    logfile << "Start time: " << get_formatted_time() << std::endl;
 
     // Count the number of lines to ensure appropriate chunking
     logfile << "Counting lines in " << filenames[0] << std::endl;
@@ -397,9 +395,7 @@ void IndirectGWAS::run(std::vector<std::string> filenames, std::string output_st
     auto end = std::chrono::high_resolution_clock::now();
 
     // Add the end time to the log file
-    logfile << "End time: "
-            << std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())
-            << std::endl;
+    logfile << "End time: " << get_formatted_time() << std::endl;
 
     // Add elapsed time
     std::chrono::duration<double> elapsed = end - start;
