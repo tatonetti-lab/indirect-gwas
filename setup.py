@@ -25,4 +25,5 @@ setup(
     ],
     zip_safe=False,
     cmdclass={"build_ext": build_ext},
+    extra_compile_args=["-std=c++20", "-O3"],
 )
