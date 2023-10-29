@@ -15,25 +15,79 @@ We provide both command line and Python interfaces.
 ```bash
 indirect-gwas \
   --projection-coefficients coef.csv \
-  --gwas-summary-statistics gwas/*.linear \
+  --gwas-summary-statistics phenotype1.glm.linear phenotype2.glm.linear \
   --variant-id-column RSID \
   --coefficient-column BETA \
   --standard-error-column SE \
   --sample-size-column N \
-  --equal-number-of-covariates 12 \
-  --output gwas/indirect
+  --number-of-covariates 12 \
+  --output indirect
 ```
 
-# Setup
+# Installation
 
-To install, run
+We will distribute this as a Python package with binary wheels for Linux, MacOS, and Windows.
+Currently, only source code is available.
+See below for a source code installation.
+
+# Installation from source
+
+## C++ dependencies
+
+Indirect GWAS relies on three external libraries: [Eigen](https://eigen.tuxfamily.org), [Boost.Math](https://www.boost.org/doc/libs/1_77_0/libs/math/doc/html/index.html), and [csv-parser](https://github.com/vincentlaucsb/csv-parser).
+As Eigen and Boost.Math are extensive libraries, they are not included in this package and must be installed separately.
+If these are already installed in a standard location, then no additional setup is required.
+Otherwise, you must specify the location of these libraries using environment variables.
+
+### 1. Libraries not already installed
+
+A short example of how to install these libraries on a Linux system is given below.
+
+```bash
+# Move to a directory where you want to install the libraries
+cd <wherever you want to install the libraries>
+
+# Install Eigen
+wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.bz2
+tar -xvf eigen-3.4.0.tar.bz2
+export EIGEN_INCLUDE_PATH=$(realpath eigen-3.4.0)
+
+# Install Boost.Math (latest stable version)
+wget https://github.com/boostorg/math/archive/refs/heads/master.zip
+unzip master.zip
+mv math-master boostmath
+export BOOST_MATH_INCLUDE_PATH=$(realpath boostmath)/include
+
+# Install csv-parser (latest stable version)
+mkdir csv-parser
+wget -O csv-parser https://raw.githubusercontent.com/vincentlaucsb/csv-parser/master/single_include/csv.hpp
+export CSV_INCLUDE_PATH=$(realpath csv-parser)
 ```
+
+### 2. Libraries already installed, but not in a standard location
+
+If these libraries were already installed but not in a standard location,
+set the environment variables to the paths where you installed the libraries.
+
+```bash
+# If not set already, set the environment variables to the paths
+# where you installed the libraries. If these are already installed
+# in a standard location, then skip this step.
+export EIGEN_INCLUDE_PATH=  # Fill in path here
+export BOOST_MATH_INCLUDE_PATH=  # Fill in path here
+export CSV_INCLUDE_PATH=  # Fill in path here
+```
+
+## Install Python package
+
+By this point, Eigen, Boost.Math, and csv-parser should be installed, either in standard
+locations like `/usr/include` or in custom locations specified by environment variables.
+
+```bash
 pip install git+https://github.com/tatonetti-lab/indirect-gwas.git
 ```
 
-This package uses Python >=3.10 and depends on numpy, pandas, scipy, and xarray.
-
-Once installed, this package exposes two command line arguments: `indirect-gwas` and `compute-feature-partial-covariance`.
+Once installed, this package exposes `indirect-gwas`.
 For help with their arguments, either use the command line help (e.g. `indirect-gwas --help`) or see the wiki.
 
 # Inputs required
@@ -87,7 +141,6 @@ Let $\hat{y}$ be the fitted values from the following regression: $y \sim \mathr
 Then the residuals for feature phenotype $i$ are $r_i = y_i - \hat{y}_i$.
 The phenotypic partial covariance matrix is the covariance matrix of all the feature residuals.
 For linear model GWAS, these residuals can be computed quickly and easily using any regression software.
-We include a helper script `compute-feature-partial-covariance`, which can be run from the command line after installing the package.
 For linear mixed models such as SAIGE, this matrix can be computed using outputs from the methods themselves (see wiki for more information).
 
 # FAQ

@@ -23,7 +23,7 @@ def parse_args():
                 b. --coefficient-column
                 c. --standard-error-column
                 d. --sample-size-column
-            4. Number of exogenous variables (-n/--number-of-exogenous)
+            4. Number of covariates (--number-of-covariates)
 
             For more information about these choices, see the documentation at
             https://github.com/tatonetti-lab/indirect-gwas/wiki.
@@ -88,12 +88,12 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--number-of-exogenous",
+        "--number-of-covariates",
         type=int,
         required=True,
-        dest="n_exogenous",
-        help="""Number of exogenous variables for the feature GWAS. E.g.
-            phenotype ~ 1 + genotype + age + sex + PC1 + PC2 would have 5 exogenous""",
+        dest="n_covar",
+        help="""Number of covariates variables for the feature GWAS. E.g.
+            phenotype ~ 1 + genotype + age + sex + PC1 + PC2 would have 4 covariates""",
     )
 
     parser.add_argument(
@@ -136,7 +136,8 @@ def parse_args():
         "--chunksize",
         type=int,
         default=100_000,
-        help="""Number of rows to read at a time. This can be used to reduce memory usage.""",
+        help="""Number of rows to read at a time. This can be used to reduce memory
+                usage.""",
     )
 
     parser.add_argument(
@@ -172,6 +173,10 @@ def main():
         # Print start datetime in human-readable format
         print(f"Started at\t{datetime.datetime.now().strftime('%c')}")
 
+    # IDEA: Automatically sort files their order in the projection coefficients file
+    # and/or feature partial covariance file. This would make wildcard expansion
+    # feasible.
+
     paths = [p.as_posix() for p in args.gwas_summary_statistics]
 
     indirect_gwas._igwas.run(
@@ -183,7 +188,7 @@ def main():
         args.projection_coefficients.as_posix(),
         args.feature_partial_covariance.as_posix(),
         args.output.as_posix(),
-        args.n_exogenous,
+        args.n_covar,
         args.chunksize,
         args.single_file_output,
     )
