@@ -147,14 +147,14 @@ void IndirectGWAS::compute_p_value(ResultsChunk &results)
     p.resizeLike(t);
     for (int i = 0; i < t.rows(); i++)
     {
+        if (dof(i) <= 0 || std::isnan(dof(i)))
+        {
+            throw std::runtime_error("Degrees of freedom is an error for variant " +
+                                        results.variant_ids[i] + " with value " +
+                                        std::to_string(dof(i)));
+        }
         for (int j = 0; j < t.cols(); j++)
         {
-            if (dof(i) <= 0 || std::isnan(dof(i)))
-            {
-                throw std::runtime_error("Degrees of freedom is an error for variant " +
-                                         results.variant_ids[i] + " with value " +
-                                         std::to_string(dof(i)));
-            }
             if (std::isnan(t(i, j)))
             {
                 std::cerr << "Erroneous T-statistic for variant "

@@ -115,7 +115,7 @@ FeatureGwasResults read_gwas_chunk(
 
         idx = row_index - start_line;
 
-        // Populate variant IDs or check that they match
+        // Populate variant IDs
         results.variant_ids[idx] = row[column_names.variant_id].get<std::string>();
 
         // Populate the data Eigen::Vectors

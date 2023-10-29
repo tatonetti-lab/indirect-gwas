@@ -126,16 +126,18 @@ def compare_direct_vs_indirect_single_file(tmpdirname, data):
     indirect_df["variant_id"] = indirect_df["variant_id"].astype(str)
 
     # Join the two dataframes
-    comparison_df = direct_df.merge(indirect_df, on=["variant_id", "projection_id"],
-                                    suffixes=("", "_indirect"))
+    comparison_df = direct_df.merge(
+        indirect_df, on=["variant_id", "projection_id"], suffixes=("", "_indirect")
+    )
 
     # Use pytest to check that all the columns are approximately equal
     for col in direct_df.columns:
         if col in ["variant_id", "projection_id"]:
             continue
 
-        max_diff = np.abs(comparison_df[f"{col}_indirect"].values -
-                            comparison_df[col].values).max()
+        max_diff = np.abs(
+            comparison_df[f"{col}_indirect"].values - comparison_df[col].values
+        ).max()
         assert max_diff == pytest.approx(0, abs=1e-4, rel=1e-4)
 
     paths = list(pathlib.Path(tmpdirname).glob("indirect*csv"))
@@ -162,16 +164,18 @@ def compare_direct_vs_indirect_multiple_files(tmpdirname, data):
         direct_df["variant_id"] = direct_df["variant_id"].astype(str)
         indirect_df["variant_id"] = indirect_df["variant_id"].astype(str)
 
-        comparison_df = direct_df.merge(indirect_df, on=["variant_id"],
-                                        suffixes=("", "_indirect"))
+        comparison_df = direct_df.merge(
+            indirect_df, on=["variant_id"], suffixes=("", "_indirect")
+        )
 
         # Use pytest to check that all the columns are approximately equal
         for col in direct_df.columns:
             if col in ["variant_id", "projection_id"]:
                 continue
 
-            max_diff = np.abs(comparison_df[f"{col}_indirect"].values -
-                              comparison_df[col].values).max()
+            max_diff = np.abs(
+                comparison_df[f"{col}_indirect"].values - comparison_df[col].values
+            ).max()
             assert max_diff == pytest.approx(0, abs=1e-4, rel=1e-4)
 
     paths = list(pathlib.Path(tmpdirname).glob("indirect*csv"))
