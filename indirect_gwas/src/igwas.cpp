@@ -79,6 +79,7 @@ void IndirectGWAS::ensure_names_consistent(std::vector<std::string> names_1,
 
 void IndirectGWAS::process_file_chunk(unsigned int k, FeatureGwasResults &results)
 {
+    // k is the index of the feature (in projection coefficients and covariance matrix)
     if (k == 0)
     {
         variant_ids = results.variant_ids;
@@ -92,14 +93,8 @@ void IndirectGWAS::process_file_chunk(unsigned int k, FeatureGwasResults &result
         degrees_of_freedom.data = degrees_of_freedom.data.cwiseMin(results.degrees_of_freedom);
     }
 
-    // Update the beta matrix
-    for (int i = 0; i < variant_ids.size(); i++)
-    {
-        for (int j = 0; j < projection_coefficients.row_names.size(); j++)
-        {
-            beta.data(i, j) += results.beta(i) * projection_coefficients.data(k, j);
-        }
-    }
+    // Update the beta matrix (outer product of beta and projection coefficients)
+    beta.data += (results.beta * projection_coefficients.data.row(k));
 
     // Update the sum of genotype partial variances
     Eigen::VectorXf &dof = results.degrees_of_freedom;
