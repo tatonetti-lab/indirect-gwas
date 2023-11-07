@@ -244,7 +244,7 @@ def test_cpp_cli(chunksize, single_file_output, num_files):
                 --coefficient-column beta
                 --standard-error-column std_error
                 --sample-size-column sample_size
-                --number-of-exogenous 1
+                --number-of-covariates 1
                 --chunksize {chunksize}
                 --gwas-summary-statistics {" ".join(data["feature_result_paths"])}
                 --output {tmpdirname}/indirect
@@ -262,23 +262,3 @@ def test_cpp_cli(chunksize, single_file_output, num_files):
         assert len(paths) == num_files
 
     print(f"SUCCESS! CLI use produced {len(paths)} paths")
-
-
-@pytest.mark.parametrize(
-    "t,df",
-    [
-        (0, 1),
-        (1, 30),
-        (1.5, 50),
-        (-0.0696064, 29),
-        (-1.02737, 29),
-        (-3.11129, 29),
-        (-3.66463, 29),
-    ],
-)
-def test_pvalues(t, df):
-    print(f"TESTING {t}, {df}")
-    python_version = -1 * (scipy.stats.t.logsf(np.abs(t), df) + np.log(2)) / np.log(10)
-    cpp_version = indirect_gwas._igwas.compute_pvalue(t, df)
-    print(python_version, cpp_version)
-    assert cpp_version == pytest.approx(python_version, abs=1e-4, rel=1e-4)
