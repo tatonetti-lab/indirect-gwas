@@ -39,6 +39,6 @@ struct ResultsChunk
     Eigen::VectorXf sample_size;
 };
 
-float compute_log_p_value(float t_statistic, unsigned int degrees_of_freedom);
+double compute_log_p_value(double t_statistic, unsigned int degrees_of_freedom);
 
 std::string get_formatted_time();
