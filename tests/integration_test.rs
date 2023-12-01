@@ -51,7 +51,6 @@ fn read_gwas_results() {
     }
 
     assert!(result.is_ok());
-
 }
 
 #[test]

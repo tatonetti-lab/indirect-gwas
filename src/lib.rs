@@ -1,10 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
 use env_logger;
-use log::info;
-use log::LevelFilter::{Info, Error};
-use std::time::Duration;
 use humantime;
+use log::info;
+use log::LevelFilter::{Error, Info};
+use std::time::Duration;
 
 pub mod io;
 pub mod stats;
@@ -63,7 +63,7 @@ pub struct InputArguments {
 
 pub fn run_cli(args: InputArguments) -> Result<()> {
     let _builder = env_logger::Builder::from_default_env()
-        .filter_level(if args.quiet {Error} else {Info})
+        .filter_level(if args.quiet { Error } else { Info })
         .format_target(false)
         .target(env_logger::Target::Stdout)
         .init();
@@ -72,7 +72,7 @@ pub fn run_cli(args: InputArguments) -> Result<()> {
 
     info!("Starting Indirect GWAS");
     let start = std::time::Instant::now();
-    
+
     util::run(
         &args.projection_matrix,
         &args.covariance_matrix,
@@ -87,7 +87,10 @@ pub fn run_cli(args: InputArguments) -> Result<()> {
     )?;
 
     let duration = Duration::new(start.elapsed().as_secs(), 0);
-    info!("Finished Indirect GWAS in {}", humantime::format_duration(duration).to_string());
+    info!(
+        "Finished Indirect GWAS in {}",
+        humantime::format_duration(duration).to_string()
+    );
 
     Ok(())
 }

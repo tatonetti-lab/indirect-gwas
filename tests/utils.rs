@@ -224,8 +224,13 @@ pub fn setup_test(
         .par_iter()
         .enumerate()
         .map(|(idx, results)| {
-            let path = dir.join("gwas").join(test_data.phenotype_ids[idx].clone())
-                .with_extension("csv").to_str().unwrap().to_string();
+            let path = dir
+                .join("gwas")
+                .join(test_data.phenotype_ids[idx].clone())
+                .with_extension("csv")
+                .to_str()
+                .unwrap()
+                .to_string();
             write_gwas_results(results, &path);
             path
         })
@@ -245,8 +250,16 @@ pub fn setup_test(
     );
 
     InputArguments {
-        projection_matrix: dir.join("projection_matrix.csv").to_str().unwrap().to_string(),
-        covariance_matrix: dir.join("covariance_matrix.csv").to_str().unwrap().to_string(),
+        projection_matrix: dir
+            .join("projection_matrix.csv")
+            .to_str()
+            .unwrap()
+            .to_string(),
+        covariance_matrix: dir
+            .join("covariance_matrix.csv")
+            .to_str()
+            .unwrap()
+            .to_string(),
         gwas_results: feature_gwas_paths,
         output_file: dir.join("igwas_results.csv").to_str().unwrap().to_string(),
         num_covar: n_covariates,

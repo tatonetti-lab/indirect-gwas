@@ -57,7 +57,7 @@ fn map_column_names(
     header: &csv::StringRecord,
     spec: &ColumnSpec,
 ) -> Result<MappedColumns, ColumnNotFound> {
-   // Find the indices of the columns we want. If any of them are not found, return an error,
+    // Find the indices of the columns we want. If any of them are not found, return an error,
     // specifying which column was not found.
     Ok(MappedColumns {
         variant_id: header
