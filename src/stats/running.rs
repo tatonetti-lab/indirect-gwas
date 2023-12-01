@@ -1,5 +1,5 @@
-use crate::igwas::stats::compute_neg_log_pvalue;
 use crate::io::{gwas::GwasResults, gwas::IGwasResults, matrix::LabeledMatrix};
+use crate::stats::sumstats::compute_neg_log_pvalue;
 
 use std::collections::HashMap;
 

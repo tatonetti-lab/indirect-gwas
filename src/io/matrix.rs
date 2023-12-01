@@ -1,5 +1,4 @@
-extern crate csv;
-
+use csv;
 use nalgebra as na;
 
 use na::DMatrix;

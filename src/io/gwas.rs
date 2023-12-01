@@ -1,7 +1,25 @@
-extern crate csv;
-extern crate nalgebra as na;
+use csv;
+use nalgebra as na;
+
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
 
 use na::DVector;
+
+use crate::io::error::{ColumnNotFound, IgwasError};
+
+pub fn count_lines(filename: &str) -> Result<usize, csv::Error> {
+    let file = File::open(filename)?;
+    let mut reader = BufReader::with_capacity(8192, file);
+    let mut num_lines = 0;
+    let mut string = String::new();
+    while reader.read_line(&mut string)? > 0 {
+        num_lines += 1;
+    }
+    Ok(num_lines - 1)
+}
 
 // Create a struct ColumnSpec to hold the names of columns
 pub struct ColumnSpec {
@@ -35,21 +53,37 @@ pub struct IGwasResults {
     pub sample_sizes: DVector<i32>,
 }
 
-fn map_column_names(header: &csv::StringRecord, spec: &ColumnSpec) -> MappedColumns {
-    // TODO: Error handling here.
-    MappedColumns {
-        variant_id: header.iter().position(|x| x == spec.variant_id).unwrap(),
-        beta: header.iter().position(|x| x == spec.beta).unwrap(),
-        se: header.iter().position(|x| x == spec.se).unwrap(),
-        sample_size: header.iter().position(|x| x == spec.sample_size).unwrap(),
-    }
+fn map_column_names(
+    header: &csv::StringRecord,
+    spec: &ColumnSpec,
+) -> Result<MappedColumns, ColumnNotFound> {
+   // Find the indices of the columns we want. If any of them are not found, return an error,
+    // specifying which column was not found.
+    Ok(MappedColumns {
+        variant_id: header
+            .iter()
+            .position(|x| x == spec.variant_id)
+            .ok_or(ColumnNotFound::new(&spec.variant_id))?,
+        beta: header
+            .iter()
+            .position(|x| x == spec.beta)
+            .ok_or(ColumnNotFound::new(&spec.beta))?,
+        se: header
+            .iter()
+            .position(|x| x == spec.se)
+            .ok_or(ColumnNotFound::new(&spec.se))?,
+        sample_size: header
+            .iter()
+            .position(|x| x == spec.sample_size)
+            .ok_or(ColumnNotFound::new(&spec.sample_size))?,
+    })
 }
 
-// TODO: Error handling here.
 fn read_from_record<T: std::str::FromStr>(record: &csv::StringRecord, index: usize) -> T
 where
     <T as std::str::FromStr>::Err: std::fmt::Debug,
 {
+    // TODO: Error handling here.
     record.get(index).unwrap().parse::<T>().unwrap()
 }
 
@@ -60,12 +94,12 @@ pub fn read_gwas_results(
     column_names: &ColumnSpec,
     start_line: usize,
     end_line: usize,
-) -> Result<GwasResults, csv::Error> {
+) -> Result<GwasResults, IgwasError> {
     let mut reader = csv::Reader::from_path(filename)?;
 
     // Get the indices of the columns we want
     let header = reader.headers()?;
-    let mapped_columns = map_column_names(&header, column_names);
+    let mapped_columns = map_column_names(&header, column_names)?;
 
     let mut variant_ids: Vec<String> = Vec::new();
     let mut beta_values: Vec<f32> = Vec::new();
@@ -96,10 +130,10 @@ pub fn write_gwas_results(results: IGwasResults, filename: &str) -> Result<(), c
 
     // Write the header
     writer.write_record(&[
-        "phenotype",
+        "phenotype_id",
         "variant_id",
         "beta",
-        "se",
+        "std_error",
         "t_stat",
         "p_value",
         "sample_size",
