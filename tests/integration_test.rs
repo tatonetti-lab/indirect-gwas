@@ -2,7 +2,6 @@ use assert_cmd::prelude::*;
 use std::process::Command;
 use tempfile::tempdir;
 
-use igwas;
 mod utils;
 
 #[test]

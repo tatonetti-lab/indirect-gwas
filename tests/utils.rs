@@ -21,7 +21,7 @@ fn residualize(x: &DMatrix<f32>, covariates: &DMatrix<f32>) -> DMatrix<f32> {
     let beta = covariates_intercept
         .clone()
         .svd(true, true)
-        .solve(&x, 1e-7)
+        .solve(x, 1e-7)
         .expect("SVD failed");
     x - covariates_intercept * beta
 }
@@ -109,8 +109,8 @@ fn gwas(
     phenotypes: &DMatrix<f32>,
     genotypes: &DMatrix<f32>,
     covariates: &DMatrix<f32>,
-    phenotype_ids: &Vec<String>,
-    variant_ids: &Vec<String>,
+    phenotype_ids: &[String],
+    variant_ids: &[String],
 ) -> Vec<Vec<GwasResults>> {
     let phenotypes_residuals = residualize(phenotypes, covariates);
     let genotype_residuals = residualize(genotypes, covariates);
@@ -246,7 +246,7 @@ pub fn setup_test(
 
     write_gwas_results(
         &projection_gwas_results,
-        &dir.join("direct_results.csv").to_str().unwrap().to_string(),
+        dir.join("direct_results.csv").to_str().unwrap(),
     );
 
     InputArguments {

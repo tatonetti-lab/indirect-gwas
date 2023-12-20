@@ -1,7 +1,5 @@
 use anyhow::Result;
 use clap::Parser;
-use env_logger;
-use humantime;
 use log::info;
 use log::LevelFilter::{Error, Info};
 use std::time::Duration;
@@ -62,7 +60,7 @@ pub struct InputArguments {
 }
 
 pub fn run_cli(args: InputArguments) -> Result<()> {
-    let _builder = env_logger::Builder::from_default_env()
+    env_logger::Builder::from_default_env()
         .filter_level(if args.quiet { Error } else { Info })
         .format_target(false)
         .target(env_logger::Target::Stdout)

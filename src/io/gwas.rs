@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use csv;
 use nalgebra as na;
 
@@ -7,8 +8,6 @@ use std::{
 };
 
 use na::DVector;
-
-use crate::io::error::{ColumnNotFound, IgwasError};
 
 pub fn count_lines(filename: &str) -> Result<usize, csv::Error> {
     let file = File::open(filename)?;
@@ -53,29 +52,26 @@ pub struct IGwasResults {
     pub sample_sizes: DVector<i32>,
 }
 
-fn map_column_names(
-    header: &csv::StringRecord,
-    spec: &ColumnSpec,
-) -> Result<MappedColumns, ColumnNotFound> {
+fn map_column_names(header: &csv::StringRecord, spec: &ColumnSpec) -> Result<MappedColumns> {
     // Find the indices of the columns we want. If any of them are not found, return an error,
     // specifying which column was not found.
     Ok(MappedColumns {
         variant_id: header
             .iter()
             .position(|x| x == spec.variant_id)
-            .ok_or(ColumnNotFound::new(&spec.variant_id))?,
+            .context("Variant ID column not found")?,
         beta: header
             .iter()
             .position(|x| x == spec.beta)
-            .ok_or(ColumnNotFound::new(&spec.beta))?,
+            .context("Beta column not found")?,
         se: header
             .iter()
             .position(|x| x == spec.se)
-            .ok_or(ColumnNotFound::new(&spec.se))?,
+            .context("Standard error column not found")?,
         sample_size: header
             .iter()
             .position(|x| x == spec.sample_size)
-            .ok_or(ColumnNotFound::new(&spec.sample_size))?,
+            .context("Sample size column not found")?,
     })
 }
 
@@ -94,12 +90,12 @@ pub fn read_gwas_results(
     column_names: &ColumnSpec,
     start_line: usize,
     end_line: usize,
-) -> Result<GwasResults, IgwasError> {
+) -> Result<GwasResults> {
     let mut reader = csv::Reader::from_path(filename)?;
 
     // Get the indices of the columns we want
     let header = reader.headers()?;
-    let mapped_columns = map_column_names(&header, column_names)?;
+    let mapped_columns = map_column_names(header, column_names)?;
 
     let mut variant_ids: Vec<String> = Vec::new();
     let mut beta_values: Vec<f32> = Vec::new();
@@ -129,7 +125,7 @@ pub fn write_gwas_results(results: IGwasResults, filename: &str) -> Result<(), c
     let mut writer = csv::Writer::from_path(filename)?;
 
     // Write the header
-    writer.write_record(&[
+    writer.write_record([
         "phenotype_id",
         "variant_id",
         "beta",
