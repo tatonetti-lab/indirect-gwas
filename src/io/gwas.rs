@@ -1,15 +1,10 @@
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+
 use anyhow::{Context, Result};
-use csv;
-use nalgebra as na;
+use nalgebra::DVector;
 
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-};
-
-use na::DVector;
-
-pub fn count_lines(filename: &str) -> Result<usize, csv::Error> {
+pub fn count_lines(filename: &str) -> Result<usize> {
     let file = File::open(filename)?;
     let mut reader = BufReader::with_capacity(8192, file);
     let mut num_lines = 0;
@@ -91,7 +86,7 @@ pub fn read_gwas_results(
     start_line: usize,
     end_line: usize,
 ) -> Result<GwasResults> {
-    let mut reader = csv::Reader::from_path(filename)?;
+    let mut reader = csv_sniffer::Sniffer::new().open_path(filename)?;
 
     // Get the indices of the columns we want
     let header = reader.headers()?;
@@ -121,7 +116,7 @@ pub fn read_gwas_results(
     })
 }
 
-pub fn write_gwas_results(results: IGwasResults, filename: &str) -> Result<(), csv::Error> {
+pub fn write_gwas_results(results: IGwasResults, filename: &str) -> Result<()> {
     let mut writer = csv::Writer::from_path(filename)?;
 
     // Write the header

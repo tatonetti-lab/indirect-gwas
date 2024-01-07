@@ -1,7 +1,5 @@
-use csv;
-use nalgebra as na;
-
-use na::DMatrix;
+use anyhow::Result;
+use nalgebra::DMatrix;
 
 pub struct LabeledMatrix {
     pub row_labels: Vec<String>,
@@ -10,8 +8,8 @@ pub struct LabeledMatrix {
 }
 
 /// Read a matrix from a file
-pub fn read_labeled_matrix(filename: &str) -> Result<LabeledMatrix, csv::Error> {
-    let mut reader = csv::Reader::from_path(filename)?;
+pub fn read_labeled_matrix(filename: &str) -> Result<LabeledMatrix> {
+    let mut reader = csv_sniffer::Sniffer::new().open_path(filename)?;
 
     let mut row_labels = Vec::new();
     let mut matrix = Vec::new();
