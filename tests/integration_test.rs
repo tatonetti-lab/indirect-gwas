@@ -65,10 +65,12 @@ fn run_fn() {
         &args.output_file,
         args.num_covar,
         args.chunksize,
-        args.variant_id,
-        args.beta,
-        args.std_error,
-        args.sample_size,
+        igwas::io::gwas::ColumnSpec {
+            variant_id: args.variant_id,
+            beta: args.beta,
+            se: args.std_error,
+            sample_size: args.sample_size,
+        },
     );
 
     if let Err(e) = result {

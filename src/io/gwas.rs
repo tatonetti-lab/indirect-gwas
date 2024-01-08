@@ -1,12 +1,14 @@
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader};
+
+use log::info;
 
 use anyhow::{Context, Result};
 use nalgebra::DVector;
 
 pub fn count_lines(filename: &str) -> Result<usize> {
     let file = File::open(filename)?;
-    let mut reader = BufReader::with_capacity(8192, file);
+    let mut reader = BufReader::with_capacity(32768, file);
     let mut num_lines = 0;
     let mut string = String::new();
     while reader.read_line(&mut string)? > 0 {
@@ -88,6 +90,9 @@ pub fn read_gwas_results(
 ) -> Result<GwasResults> {
     let mut reader = csv_sniffer::Sniffer::new().open_path(filename)?;
 
+    info!("Headers: {:?}", reader.headers()?);
+    info!("Start line: {}, end line: {}", start_line, end_line);
+
     // Get the indices of the columns we want
     let header = reader.headers()?;
     let mapped_columns = map_column_names(header, column_names)?;
@@ -99,7 +104,11 @@ pub fn read_gwas_results(
 
     for (i, result) in reader.records().enumerate() {
         let record = result?;
-        if i >= start_line && i <= end_line {
+        if i < start_line {
+            continue;
+        } else if i >= end_line {
+            break;
+        } else {
             variant_ids.push(read_from_record(&record, mapped_columns.variant_id));
             beta_values.push(read_from_record(&record, mapped_columns.beta));
             se_values.push(read_from_record(&record, mapped_columns.se));
@@ -116,19 +125,31 @@ pub fn read_gwas_results(
     })
 }
 
-pub fn write_gwas_results(results: IGwasResults, filename: &str) -> Result<()> {
-    let mut writer = csv::Writer::from_path(filename)?;
+pub fn write_gwas_results(results: IGwasResults, filename: &str, add_header: bool) -> Result<()> {
+    let file = if add_header {
+        OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(filename)?
+    } else {
+        OpenOptions::new().append(true).open(filename)?
+    };
+
+    let mut writer = csv::WriterBuilder::new().delimiter(b'\t').from_writer(file);
 
     // Write the header
-    writer.write_record([
-        "phenotype_id",
-        "variant_id",
-        "beta",
-        "std_error",
-        "t_stat",
-        "p_value",
-        "sample_size",
-    ])?;
+    if add_header {
+        writer.write_record([
+            "phenotype_id",
+            "variant_id",
+            "beta",
+            "std_error",
+            "t_stat",
+            "p_value",
+            "sample_size",
+        ])?;
+    }
 
     // Write the results
     for i in 0..results.variant_ids.len() {

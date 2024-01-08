@@ -71,6 +71,13 @@ pub fn run_cli(args: InputArguments) -> Result<()> {
     info!("Starting Indirect GWAS");
     let start = std::time::Instant::now();
 
+    let column_names = io::gwas::ColumnSpec {
+        variant_id: args.variant_id,
+        beta: args.beta,
+        se: args.std_error,
+        sample_size: args.sample_size,
+    };
+
     util::run(
         &args.projection_matrix,
         &args.covariance_matrix,
@@ -78,10 +85,7 @@ pub fn run_cli(args: InputArguments) -> Result<()> {
         &args.output_file,
         args.num_covar,
         args.chunksize,
-        args.variant_id,
-        args.beta,
-        args.std_error,
-        args.sample_size,
+        column_names,
     )?;
 
     let duration = Duration::new(start.elapsed().as_secs(), 0);

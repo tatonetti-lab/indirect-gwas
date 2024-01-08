@@ -1,9 +1,10 @@
 use std::path::Path;
 
-use igwas::{stats::sumstats::compute_neg_log_pvalue, InputArguments};
 use nalgebra::{DMatrix, DVector};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+
+use igwas::{stats::sumstats::compute_neg_log_pvalue, InputArguments};
 
 pub struct TestData {
     pub variant_ids: Vec<String>,
@@ -273,7 +274,7 @@ pub fn setup_test(
 }
 
 fn read_igwas_results(path: &str) -> Vec<GwasResults> {
-    let mut reader = csv::Reader::from_path(path).unwrap();
+    let mut reader = csv_sniffer::Sniffer::new().open_path(path).unwrap();
     let mut results = Vec::new();
     for result in reader.deserialize() {
         let result = result.unwrap();

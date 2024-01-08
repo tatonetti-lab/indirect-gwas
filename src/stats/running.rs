@@ -1,9 +1,9 @@
-use crate::io::{gwas::GwasResults, gwas::IGwasResults, matrix::LabeledMatrix};
-use crate::stats::sumstats::compute_neg_log_pvalue;
-
 use std::collections::HashMap;
 
 use nalgebra::{Const, DMatrix, DVector, Dyn};
+
+use crate::io::{gwas::GwasResults, gwas::IGwasResults, matrix::LabeledMatrix};
+use crate::stats::sumstats::compute_neg_log_pvalue;
 
 pub struct RunningSufficientStats {
     pub beta: DMatrix<f32>,
@@ -84,6 +84,21 @@ impl RunningSufficientStats {
             n_features_seen: 0,
         }
     }
+
+    pub fn clear_chunk(&mut self, new_chunksize: usize) {
+        if new_chunksize != self.chunksize {
+            self.beta = DMatrix::zeros(new_chunksize, self.n_projections);
+            self.gpv = DVector::zeros(new_chunksize);
+            self.sample_sizes = DVector::zeros(new_chunksize);
+            self.chunksize = new_chunksize;
+        } else {
+            self.beta.fill(0.0);
+            self.gpv.fill(0.0);
+            self.sample_sizes.fill(0);
+        }
+        self.n_features_seen = 0;
+    }
+
     pub fn update(&mut self, phenotype_id: &str, gwas_results: &GwasResults) {
         if self.n_features_seen == 0 {
             self.sample_sizes = gwas_results.sample_sizes.clone();
