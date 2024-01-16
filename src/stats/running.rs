@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 
 use nalgebra::{Const, DMatrix, DVector, Dyn};
+use rayon::prelude::*;
 
-use crate::io::{gwas::GwasResults, gwas::IGwasResults, matrix::LabeledMatrix};
+use crate::io::{gwas::IGwasResults, gwas::IntermediateResults, matrix::LabeledMatrix};
 use crate::stats::sumstats::compute_neg_log_pvalue;
+use crate::util::ProcessingStats;
 
+#[derive(Clone)]
 pub struct RunningSufficientStats {
     pub beta: DMatrix<f32>,
     pub gpv: DVector<f32>,
@@ -99,7 +102,17 @@ impl RunningSufficientStats {
         self.n_features_seen = 0;
     }
 
-    pub fn update(&mut self, phenotype_id: &str, gwas_results: &GwasResults) {
+    pub fn build_processing_stats(&self) -> ProcessingStats {
+        ProcessingStats {
+            n_variants: self.beta.nrows(),
+            proj: self.proj.clone(),
+            fpv: self.fpv.clone(),
+            phenotype_id_to_idx: self.phenotype_id_to_idx.clone(),
+            n_covar: self.n_covar,
+        }
+    }
+
+    pub fn update(&mut self, gwas_results: &IntermediateResults) {
         if self.n_features_seen == 0 {
             self.sample_sizes = gwas_results.sample_sizes.clone();
             self.variant_ids = Some(gwas_results.variant_ids.clone());
@@ -113,20 +126,8 @@ impl RunningSufficientStats {
             );
         }
 
-        let phenotype_idx = self.phenotype_id_to_idx[phenotype_id];
-        let coef = &self.proj.row(phenotype_idx);
-
-        let b = &gwas_results.beta_values;
-        let se = &gwas_results.se_values;
-        let ss = &gwas_results.sample_sizes;
-
-        self.beta += b * coef;
-
-        self.gpv += DMatrix::from_fn(self.gpv.nrows(), 1, |i, _| {
-            self.fpv[phenotype_idx]
-                / (se[i].powi(2) * (ss[i] - self.n_covar as i32 - 2) as f32 + b[i].powi(2))
-        });
-
+        self.beta += &gwas_results.beta_update;
+        self.gpv += &gwas_results.gpv_update;
         self.n_features_seen += 1;
     }
 
@@ -141,20 +142,35 @@ impl RunningSufficientStats {
         self.gpv /= self.n_features_seen as f32;
         let dof = self.sample_sizes.map(|x| x - 2 - self.n_covar as i32);
         let ppv = (self.proj.transpose() * &self.cov * &self.proj).diagonal();
-        let se = DMatrix::from_fn(self.gpv.nrows(), ppv.nrows(), |i, j| {
-            ((ppv[j] / self.gpv[i] - self.beta[(i, j)].powi(2)) / dof[i] as f32).sqrt()
-        });
+        let mut se = DMatrix::zeros(self.gpv.nrows(), ppv.nrows());
+        se.par_column_iter_mut()
+            .enumerate()
+            .for_each(|(j, mut col)| {
+                for i in 0..col.len() {
+                    col[i] =
+                        ((ppv[j] / self.gpv[i] - self.beta[(i, j)].powi(2)) / dof[i] as f32).sqrt();
+                }
+            });
         let t_stat = self.beta.component_div(&se);
-        let p_values = DMatrix::from_fn(t_stat.nrows(), t_stat.ncols(), |i, j| {
-            compute_neg_log_pvalue(t_stat[(i, j)], dof[i])
-        });
+        let mut p_values = DMatrix::zeros(t_stat.nrows(), t_stat.ncols());
+        p_values
+            .par_column_iter_mut()
+            .enumerate()
+            .for_each(|(j, mut col)| {
+                for i in 0..col.len() {
+                    col[i] = compute_neg_log_pvalue(t_stat[(i, j)], dof[i]);
+                }
+            });
 
         let n_elements = self.beta.nrows() * self.beta.ncols();
 
-        let variant_ids: Vec<String> = std::iter::repeat(self.variant_ids.clone().unwrap())
-            .take(self.n_projections)
-            .flatten()
-            .collect();
+        let existing_variant_ids = self.variant_ids.clone().unwrap();
+        let mut variant_ids = Vec::with_capacity(self.n_projections * existing_variant_ids.len());
+        variant_ids.extend(
+            std::iter::repeat(existing_variant_ids)
+                .take(self.n_projections)
+                .flatten(),
+        );
 
         let sample_sizes: DVector<i32> = DVector::from_vec(
             self.sample_sizes

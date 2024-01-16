@@ -54,6 +54,14 @@ pub struct InputArguments {
     #[arg(long, default_value_t = String::from("OBS_CT"))]
     pub sample_size: String,
 
+    /// Number of threads to use
+    #[arg(short, long, default_value_t = 1)]
+    pub num_threads: usize,
+
+    /// Whether to compress the output using zstd
+    #[arg(long, default_value_t = false)]
+    pub compress: bool,
+
     /// Suppress output
     #[arg(short, long)]
     pub quiet: bool,
@@ -78,13 +86,24 @@ pub fn run_cli(args: InputArguments) -> Result<()> {
         sample_size: args.sample_size,
     };
 
+    let runtime_config = util::RuntimeConfig {
+        num_threads: args.num_threads,
+        chunksize: args.chunksize,
+        compress: args.compress,
+    };
+
+    let _pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(args.num_threads)
+        .build()
+        .unwrap();
+
     util::run(
         &args.projection_matrix,
         &args.covariance_matrix,
         &args.gwas_results,
         &args.output_file,
         args.num_covar,
-        args.chunksize,
+        runtime_config,
         column_names,
     )?;
 
