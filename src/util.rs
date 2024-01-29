@@ -61,6 +61,7 @@ pub struct RuntimeConfig {
     pub num_threads: usize,
     pub chunksize: usize,
     pub compress: bool,
+    pub capacity: usize,
 }
 
 fn gwas_reader(
@@ -139,8 +140,10 @@ fn process_chunk(
 ) -> Result<()> {
     let processing_stats = Arc::new(running.lock().unwrap().build_processing_stats());
 
-    let (raw_sender, raw_receiver) = crossbeam_channel::unbounded::<(String, GwasResults)>();
-    let (fmt_sender, fmt_receiver) = crossbeam_channel::unbounded::<IntermediateResults>();
+    let (raw_sender, raw_receiver) =
+        crossbeam_channel::bounded::<(String, GwasResults)>(runtime_config.capacity);
+    let (fmt_sender, fmt_receiver) =
+        crossbeam_channel::bounded::<IntermediateResults>(runtime_config.capacity);
 
     let updater = std::thread::spawn({
         let running = running.clone();

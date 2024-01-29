@@ -298,6 +298,7 @@ pub fn setup_test(
         std_error: "std_error".to_string(),
         sample_size: "sample_size".to_string(),
         num_threads: 2,
+        capacity: 10,
         compress: false,
         quiet: true,
     }

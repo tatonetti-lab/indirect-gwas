@@ -90,6 +90,7 @@ fn run_fn() {
             num_threads: args.num_threads,
             chunksize: args.chunksize,
             compress: false,
+            capacity: args.num_threads,
         },
         igwas::io::gwas::ColumnSpec {
             variant_id: args.variant_id,
@@ -127,6 +128,7 @@ fn run_fn_compressed() {
             num_threads: args.num_threads,
             chunksize: args.chunksize,
             compress: false,
+            capacity: args.num_threads,
         },
         igwas::io::gwas::ColumnSpec {
             variant_id: args.variant_id,

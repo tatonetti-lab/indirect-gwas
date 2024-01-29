@@ -57,6 +57,10 @@ pub struct InputArguments {
     #[arg(short, long, default_value_t = 1)]
     pub num_threads: usize,
 
+    /// Number of GWAS results chunks to hold in memory at once
+    #[arg(long, default_value_t = 25)]
+    pub capacity: usize,
+
     /// Whether to compress the output using zstd
     #[arg(long, default_value_t = false)]
     pub compress: bool,
@@ -83,6 +87,7 @@ pub fn run_cli(args: InputArguments) -> Result<()> {
         num_threads: args.num_threads,
         chunksize: args.chunksize,
         compress: args.compress,
+        capacity: args.capacity,
     };
 
     let _pool = rayon::ThreadPoolBuilder::new()
