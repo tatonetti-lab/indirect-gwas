@@ -43,6 +43,8 @@ fn check_filter_inputs(
         phenotype_to_gwas_path.insert(phenotype, gwas_path.to_string());
     }
 
+    info!("Found GWAS result files: {:?}", gwas_result_files);
+
     let mut final_gwas_paths = Vec::new();
     for phenotype in projection_labels {
         let path = phenotype_to_gwas_path.remove(phenotype).ok_or(anyhow!(
@@ -69,11 +71,12 @@ fn gwas_reader(
     num_lines: usize,
     output: Sender<(String, io::gwas::GwasResults)>,
 ) -> Result<()> {
-    for filename in gwas_result_files {
+    let n_files = gwas_result_files.len();
+    for (i, filename) in gwas_result_files.iter().enumerate() {
         let phenotype_name = gwas_path_to_phenotype(filename);
         info!(
-            "Reading lines {} to {} of {} in {}. Interpreted phenotype name: {}",
-            start_line, end_line, num_lines, filename, phenotype_name
+            "File {} of {}: Reading lines {} to {} of {} in {}. Interpreted phenotype name: {}",
+            i, n_files, start_line, end_line, num_lines, filename, phenotype_name
         );
 
         let gwas_results =
