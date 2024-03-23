@@ -9,8 +9,13 @@ pub struct LabeledMatrix {
 
 /// Read a matrix from a file
 pub fn read_labeled_matrix(filename: &str) -> Result<LabeledMatrix> {
-    let mut reader = csv_sniffer::Sniffer::new()
-        .open_path(filename)
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(if filename.ends_with(".csv") {
+            b','
+        } else {
+            b'\t'
+        })
+        .from_path(filename)
         .with_context(|| format!("Failed to open file {}", filename))?;
 
     let mut row_labels = Vec::new();
