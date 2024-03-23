@@ -1,5 +1,7 @@
 # Indirect GWAS
 
+![Test package](https://github.com/zietzm/igwas/actions/workflows/tests.yml/badge.svg?branch=main)
+
 Indirect GWAS is a Rust program for computing genome-wide association study results indirectly.
 Unlike traditional methods, indirect GWAS generates GWAS summary statistics for a phenotype definition using only other summary statistics.
 To do so, we approximate a target phenotype using phenotypes for which GWAS summary statistics are already available.
@@ -23,9 +25,7 @@ Alternatively, install from source code.
 If cargo is not installed, see [cargo installation](https://doc.rust-lang.org/cargo/getting-started/installation.html).
 
 ```bash
-git clone --depth 1 https://github.com/zietzm/igwas.git
-
-cargo install --path igwas
+cargo install --git https://github.com/zietzm/igwas
 ```
 
 ## Usage
