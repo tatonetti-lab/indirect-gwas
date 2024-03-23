@@ -1,7 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
 use log::info;
-use log::LevelFilter::{Error, Info};
 use std::time::Duration;
 
 pub mod io;
@@ -68,12 +67,6 @@ pub struct InputArguments {
 }
 
 pub fn run_cli(args: InputArguments) -> Result<()> {
-    env_logger::Builder::from_default_env()
-        .filter_level(if args.quiet { Error } else { Info })
-        .format_target(false)
-        .target(env_logger::Target::Stdout)
-        .init();
-
     info!("Received arguments: {:#?}", &args);
 
     info!("Starting Indirect GWAS");
