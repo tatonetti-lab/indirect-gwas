@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use anyhow::Result;
 use nalgebra::{DMatrix, DVector};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -137,15 +138,29 @@ fn gwas(
         .collect()
 }
 
-fn write_gwas_results(results: &Vec<GwasResults>, output_path: &str) {
-    let mut writer = csv::Writer::from_path(output_path).unwrap();
-    for result in results {
-        writer.serialize(result).unwrap();
+fn write_gwas_results(results: &Vec<GwasResults>, output_path: &str, compress: bool) {
+    if compress {
+        let file = zstd::Encoder::new(std::fs::File::create(output_path).unwrap(), 0)
+            .unwrap()
+            .auto_finish();
+        let mut writer = csv::WriterBuilder::new().delimiter(b'\t').from_writer(file);
+        for result in results {
+            writer.serialize(result).unwrap();
+        }
+        writer.flush().unwrap();
+    } else {
+        let mut writer = csv::WriterBuilder::new()
+            .delimiter(b'\t')
+            .from_path(output_path)
+            .unwrap();
+        for result in results {
+            writer.serialize(result).unwrap();
+        }
+        writer.flush().unwrap();
     }
-    writer.flush().unwrap();
 }
 
-fn write_test_data(test_data: &TestData, dir: &Path) -> Result<(), std::io::Error> {
+fn write_test_data(test_data: &TestData, dir: &Path, compress: bool) -> Result<()> {
     let mut writer = csv::Writer::from_path(dir.join("genotypes.csv"))?;
     for row in test_data.genotypes.row_iter() {
         writer.write_record(row.iter().map(|x| x.to_string()))?;
@@ -170,18 +185,29 @@ fn write_test_data(test_data: &TestData, dir: &Path) -> Result<(), std::io::Erro
     writer.write_record(header_row)?;
     for (idx, row) in test_data.projection_matrix.row_iter().enumerate() {
         let mut row_vec = row.iter().map(|x| x.to_string()).collect::<Vec<String>>();
-        row_vec.insert(0, test_data.phenotype_ids[idx].clone());
+        row_vec.insert(
+            0,
+            test_data.phenotype_ids[idx].clone() + ".tsv" + if compress { ".zst" } else { "" },
+        );
         writer.write_record(row_vec)?;
     }
     writer.flush()?;
 
     let mut writer = csv::Writer::from_path(dir.join("covariance_matrix.csv"))?;
-    let mut header_row = test_data.phenotype_ids.clone();
+    let mut header_row = test_data
+        .phenotype_ids
+        .clone()
+        .into_iter()
+        .map(|x| x + ".tsv" + if compress { ".zst" } else { "" })
+        .collect::<Vec<String>>();
     header_row.insert(0, "phenotype_id".to_string());
     writer.write_record(header_row)?;
     for (idx, row) in test_data.covariance_matrix.row_iter().enumerate() {
         let mut row_vec = row.iter().map(|x| x.to_string()).collect::<Vec<String>>();
-        row_vec.insert(0, test_data.phenotype_ids[idx].clone());
+        row_vec.insert(
+            0,
+            test_data.phenotype_ids[idx].clone() + ".tsv" + if compress { ".zst" } else { "" },
+        );
         writer.write_record(row_vec)?;
     }
     writer.flush()?;
@@ -195,6 +221,7 @@ pub fn setup_test(
     n_covariates: usize,
     n_phenotypes: usize,
     n_projections: usize,
+    compress: bool,
 ) -> InputArguments {
     std::fs::create_dir_all(dir.join("gwas")).unwrap();
 
@@ -205,7 +232,7 @@ pub fn setup_test(
         n_phenotypes,
         n_projections,
     );
-    write_test_data(&test_data, dir).unwrap();
+    write_test_data(&test_data, dir, compress).unwrap();
 
     let do_gwas =
         |phenotypes: &DMatrix<f32>, phenotype_ids: &Vec<String>| -> Vec<Vec<GwasResults>> {
@@ -228,11 +255,11 @@ pub fn setup_test(
             let path = dir
                 .join("gwas")
                 .join(test_data.phenotype_ids[idx].clone())
-                .with_extension("csv")
+                .with_extension("tsv".to_string() + if compress { ".zst" } else { "" })
                 .to_str()
                 .unwrap()
                 .to_string();
-            write_gwas_results(results, &path);
+            write_gwas_results(results, &path, compress);
             path
         })
         .collect();
@@ -248,6 +275,7 @@ pub fn setup_test(
     write_gwas_results(
         &projection_gwas_results,
         dir.join("direct_results.csv").to_str().unwrap(),
+        false,
     );
 
     InputArguments {

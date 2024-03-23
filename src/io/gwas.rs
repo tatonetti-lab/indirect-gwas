@@ -5,6 +5,15 @@ use anyhow::{Context, Result};
 use nalgebra::{DMatrix, DVector};
 
 pub fn count_lines(filename: &str) -> Result<usize> {
+    if filename.ends_with(".zst") {
+        let file = File::open(filename)?;
+        let reader = BufReader::new(file);
+        let decoder = zstd::stream::read::Decoder::with_buffer(reader)?;
+        let mut reader = csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .from_reader(decoder);
+        return Ok(reader.records().count());
+    }
     let file = File::open(filename)?;
     let mut reader = BufReader::with_capacity(32768, file);
     let mut num_lines = 0;
@@ -94,8 +103,18 @@ pub fn read_gwas_results(
     start_line: usize,
     end_line: usize,
 ) -> Result<GwasResults> {
+    if filename.ends_with(".zst") {
+        let file = File::open(filename)?;
+        let reader = BufReader::new(file);
+        let decoder = zstd::stream::read::Decoder::with_buffer(reader)?;
+        // Can't (easily) use csv_sniffer with zstd. Assume tab delimiter.
+        let mut reader = csv::ReaderBuilder::new()
+            .delimiter(b'\t')
+            .has_headers(true)
+            .from_reader(decoder);
+        return read_gwas_rows(&mut reader, column_names, start_line, end_line);
+    }
     let mut reader = csv_sniffer::Sniffer::new().open_path(filename)?;
-
     read_gwas_rows(&mut reader, column_names, start_line, end_line)
 }
 

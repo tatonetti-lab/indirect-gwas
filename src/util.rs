@@ -14,7 +14,7 @@ use crate::stats::running::RunningSufficientStats;
 
 fn gwas_path_to_phenotype(filename: &str) -> String {
     Path::new(filename)
-        .file_stem()
+        .file_name()
         .unwrap()
         .to_str()
         .unwrap()
