@@ -96,6 +96,15 @@ pub fn read_gwas_results(
 ) -> Result<GwasResults> {
     let mut reader = csv_sniffer::Sniffer::new().open_path(filename)?;
 
+    read_gwas_rows(&mut reader, column_names, start_line, end_line)
+}
+
+fn read_gwas_rows<T: std::io::Read>(
+    reader: &mut csv::Reader<T>,
+    column_names: &ColumnSpec,
+    start_line: usize,
+    end_line: usize,
+) -> Result<GwasResults> {
     // Get the indices of the columns we want
     let header = reader.headers()?;
     let mapped_columns = map_column_names(header, column_names)?;
@@ -109,14 +118,14 @@ pub fn read_gwas_results(
         let record = result?;
         if i < start_line {
             continue;
-        } else if i >= end_line {
-            break;
-        } else {
-            variant_ids.push(read_from_record(&record, mapped_columns.variant_id));
-            beta_values.push(read_from_record(&record, mapped_columns.beta));
-            se_values.push(read_from_record(&record, mapped_columns.se));
-            sample_sizes.push(read_from_record(&record, mapped_columns.sample_size));
         }
+        if i >= end_line {
+            break;
+        }
+        variant_ids.push(read_from_record(&record, mapped_columns.variant_id));
+        beta_values.push(read_from_record(&record, mapped_columns.beta));
+        se_values.push(read_from_record(&record, mapped_columns.se));
+        sample_sizes.push(read_from_record(&record, mapped_columns.sample_size));
     }
 
     // Return the results
