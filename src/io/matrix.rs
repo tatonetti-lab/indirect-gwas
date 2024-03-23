@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use nalgebra::DMatrix;
 
 pub struct LabeledMatrix {
@@ -9,7 +9,9 @@ pub struct LabeledMatrix {
 
 /// Read a matrix from a file
 pub fn read_labeled_matrix(filename: &str) -> Result<LabeledMatrix> {
-    let mut reader = csv_sniffer::Sniffer::new().open_path(filename)?;
+    let mut reader = csv_sniffer::Sniffer::new()
+        .open_path(filename)
+        .with_context(|| format!("Failed to open file {}", filename))?;
 
     let mut row_labels = Vec::new();
     let mut matrix = Vec::new();
