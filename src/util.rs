@@ -77,7 +77,13 @@ fn gwas_reader(
         let phenotype_name = gwas_path_to_phenotype(filename);
         info!(
             "File {} of {}: Reading lines {} to {} of {} in {}. Interpreted phenotype name: {}",
-            i, n_files, start_line, end_line, num_lines, filename, phenotype_name
+            i + 1,
+            n_files,
+            start_line,
+            end_line,
+            num_lines,
+            filename,
+            phenotype_name
         );
 
         let gwas_results =
