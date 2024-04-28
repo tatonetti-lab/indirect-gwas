@@ -9,7 +9,7 @@ pub mod util;
 
 /// Perform an indirect GWAS.
 /// See our preprint for more details:
-/// biorxiv.org/content/10.1101/2023.11.20.567948v1
+/// https://www.biorxiv.org/content/10.1101/2023.11.20.567948v2
 #[derive(Parser, Debug)]
 #[command(author, version)]
 pub struct InputArguments {
