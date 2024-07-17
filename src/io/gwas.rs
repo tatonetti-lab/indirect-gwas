@@ -10,7 +10,7 @@ pub fn count_lines(filename: &str) -> Result<usize> {
         let reader = BufReader::new(file);
         let decoder = zstd::stream::read::Decoder::with_buffer(reader)?;
         let mut reader = csv::ReaderBuilder::new()
-            .delimiter(b'\t')
+            .delimiter(b',')
             .from_reader(decoder);
         return Ok(reader.records().count());
     }
@@ -71,7 +71,12 @@ fn map_column_names(header: &csv::StringRecord, spec: &ColumnSpec) -> Result<Map
         variant_id: header
             .iter()
             .position(|x| x == spec.variant_id)
-            .context("Variant ID column not found")?,
+            .with_context(|| {
+                format!(
+                    "Variant ID column not found: {} not in {:?}",
+                    spec.variant_id, header
+                )
+            })?,
         beta: header
             .iter()
             .position(|x| x == spec.beta)
@@ -107,9 +112,9 @@ pub fn read_gwas_results(
         let file = File::open(filename)?;
         let reader = BufReader::new(file);
         let decoder = zstd::stream::read::Decoder::with_buffer(reader)?;
-        // Can't (easily) use csv_sniffer with zstd. Assume tab delimiter.
+        // Can't (easily) use csv_sniffer with zstd. Assume comma delimiter.
         let mut reader = csv::ReaderBuilder::new()
-            .delimiter(b'\t')
+            .delimiter(b',')
             .has_headers(true)
             .from_reader(decoder);
         return read_gwas_rows(&mut reader, column_names, start_line, end_line);
