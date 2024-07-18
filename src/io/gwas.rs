@@ -10,7 +10,7 @@ pub fn count_lines(filename: &str) -> Result<usize> {
         let reader = BufReader::new(file);
         let decoder = zstd::stream::read::Decoder::with_buffer(reader)?;
         let mut reader = csv::ReaderBuilder::new()
-            .delimiter(b',')
+            .delimiter(b'\t')
             .from_reader(decoder);
         return Ok(reader.records().count());
     }
