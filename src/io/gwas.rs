@@ -112,9 +112,9 @@ pub fn read_gwas_results(
         let file = File::open(filename)?;
         let reader = BufReader::new(file);
         let decoder = zstd::stream::read::Decoder::with_buffer(reader)?;
-        // Can't (easily) use csv_sniffer with zstd. Assume comma delimiter.
+        // Can't (easily) use csv_sniffer with zstd. Assume tab delimiter.
         let mut reader = csv::ReaderBuilder::new()
-            .delimiter(b',')
+            .delimiter(b'\t')
             .has_headers(true)
             .from_reader(decoder);
         return read_gwas_rows(&mut reader, column_names, start_line, end_line);
