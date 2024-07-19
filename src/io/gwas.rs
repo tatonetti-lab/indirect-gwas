@@ -92,12 +92,24 @@ fn map_column_names(header: &csv::StringRecord, spec: &ColumnSpec) -> Result<Map
     })
 }
 
-fn read_from_record<T: std::str::FromStr>(record: &csv::StringRecord, index: usize) -> T
-where
-    <T as std::str::FromStr>::Err: std::fmt::Debug,
-{
-    // TODO: Error handling here.
-    record.get(index).unwrap().parse::<T>().unwrap()
+fn read_from_record_f32(record: &csv::StringRecord, index: usize) -> f32 {
+    record
+        .get(index)
+        .unwrap()
+        .parse::<f32>()
+        .unwrap_or(f32::NAN)
+}
+
+fn read_from_record_i32(record: &csv::StringRecord, index: usize) -> i32 {
+    record.get(index).unwrap().parse::<i32>().unwrap_or(0)
+}
+
+fn read_from_record_string(record: &csv::StringRecord, index: usize) -> String {
+    record
+        .get(index)
+        .unwrap()
+        .parse::<String>()
+        .unwrap_or_else(|_| String::from(""))
 }
 
 /// Read GWAS summary statistics from a file
@@ -146,10 +158,10 @@ fn read_gwas_rows<T: std::io::Read>(
         if i >= end_line {
             break;
         }
-        variant_ids.push(read_from_record(&record, mapped_columns.variant_id));
-        beta_values.push(read_from_record(&record, mapped_columns.beta));
-        se_values.push(read_from_record(&record, mapped_columns.se));
-        sample_sizes.push(read_from_record(&record, mapped_columns.sample_size));
+        variant_ids.push(read_from_record_string(&record, mapped_columns.variant_id));
+        beta_values.push(read_from_record_f32(&record, mapped_columns.beta));
+        se_values.push(read_from_record_f32(&record, mapped_columns.se));
+        sample_sizes.push(read_from_record_i32(&record, mapped_columns.sample_size));
     }
 
     // Return the results
