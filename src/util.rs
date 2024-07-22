@@ -134,12 +134,16 @@ impl ProcessingStats {
     }
 }
 
-fn process_chunk(
-    gwas_result_files: Vec<String>,
-    column_names: io::gwas::ColumnSpec,
+struct LineSpec {
     start_line: usize,
     end_line: usize,
     num_lines: usize,
+}
+
+fn process_chunk(
+    gwas_result_files: Vec<String>,
+    column_names: io::gwas::ColumnSpec,
+    lines: LineSpec,
     output_file: &str,
     runtime_config: &RuntimeConfig,
     running: Arc<Mutex<RunningSufficientStats>>,
@@ -182,9 +186,9 @@ fn process_chunk(
             gwas_reader(
                 &gwas_result_files,
                 column_names,
-                start_line,
-                end_line,
-                num_lines,
+                lines.start_line,
+                lines.end_line,
+                lines.num_lines,
                 sender,
             )
         }
@@ -205,7 +209,7 @@ fn process_chunk(
     let final_stats = running.lock().unwrap().compute_final_stats();
 
     info!("Writing results to file: {}", output_file);
-    let include_header = start_line == 0;
+    let include_header = lines.start_line == 0;
     io::gwas::write_gwas_results(
         final_stats,
         output_file,
@@ -272,9 +276,11 @@ pub fn run(
         process_chunk(
             gwas_result_files.clone(),
             column_names.clone(),
-            start_line,
-            end_line,
-            num_lines,
+            LineSpec {
+                start_line,
+                end_line,
+                num_lines,
+            },
             output_file,
             &runtime_config,
             running.clone(),
