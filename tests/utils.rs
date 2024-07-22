@@ -160,7 +160,7 @@ fn write_gwas_results(results: &Vec<GwasResults>, output_path: &str, compress: b
     }
 }
 
-fn write_test_data(test_data: &TestData, dir: &Path, compress: bool) -> Result<()> {
+fn write_test_data(test_data: &TestData, dir: &Path) -> Result<()> {
     let mut writer = csv::Writer::from_path(dir.join("genotypes.csv"))?;
     for row in test_data.genotypes.row_iter() {
         writer.write_record(row.iter().map(|x| x.to_string()))?;
@@ -185,29 +185,18 @@ fn write_test_data(test_data: &TestData, dir: &Path, compress: bool) -> Result<(
     writer.write_record(header_row)?;
     for (idx, row) in test_data.projection_matrix.row_iter().enumerate() {
         let mut row_vec = row.iter().map(|x| x.to_string()).collect::<Vec<String>>();
-        row_vec.insert(
-            0,
-            test_data.phenotype_ids[idx].clone() + ".tsv" + if compress { ".zst" } else { "" },
-        );
+        row_vec.insert(0, test_data.phenotype_ids[idx].clone());
         writer.write_record(row_vec)?;
     }
     writer.flush()?;
 
     let mut writer = csv::Writer::from_path(dir.join("covariance_matrix.csv"))?;
-    let mut header_row = test_data
-        .phenotype_ids
-        .clone()
-        .into_iter()
-        .map(|x| x + ".tsv" + if compress { ".zst" } else { "" })
-        .collect::<Vec<String>>();
+    let mut header_row = test_data.phenotype_ids.clone();
     header_row.insert(0, "phenotype_id".to_string());
     writer.write_record(header_row)?;
     for (idx, row) in test_data.covariance_matrix.row_iter().enumerate() {
         let mut row_vec = row.iter().map(|x| x.to_string()).collect::<Vec<String>>();
-        row_vec.insert(
-            0,
-            test_data.phenotype_ids[idx].clone() + ".tsv" + if compress { ".zst" } else { "" },
-        );
+        row_vec.insert(0, test_data.phenotype_ids[idx].clone());
         writer.write_record(row_vec)?;
     }
     writer.flush()?;
@@ -232,7 +221,7 @@ pub fn setup_test(
         n_phenotypes,
         n_projections,
     );
-    write_test_data(&test_data, dir, compress).unwrap();
+    write_test_data(&test_data, dir).unwrap();
 
     let do_gwas =
         |phenotypes: &DMatrix<f32>, phenotype_ids: &Vec<String>| -> Vec<Vec<GwasResults>> {

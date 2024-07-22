@@ -18,6 +18,9 @@ fn gwas_path_to_phenotype(filename: &str) -> String {
         .unwrap()
         .to_str()
         .unwrap()
+        .split('.')
+        .next()
+        .unwrap()
         .to_string()
 }
 
