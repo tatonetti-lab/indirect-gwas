@@ -36,7 +36,10 @@ pub fn read_labeled_matrix(filename: &str) -> Result<LabeledMatrix> {
             if i == 0 {
                 row_labels.push(value.to_string());
             } else {
-                matrix.push(value.parse::<f32>().unwrap());
+                match value.parse::<f32>() {
+                    Ok(v) => matrix.push(v),
+                    Err(_) => matrix.push(f32::NAN),
+                }
             }
         }
     }
