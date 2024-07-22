@@ -74,7 +74,7 @@ struct GwasResults {
     pub beta: f32,
     pub std_error: f32,
     pub t_stat: f32,
-    pub p_value: f32,
+    pub neg_log_p_value: f32,
     pub sample_size: usize,
 }
 
@@ -94,7 +94,7 @@ fn single_gwas_regression(
     let std_err =
         (resids.map(|x| x.powi(2)).sum() / (gt2 * (n - num_covariates as f32 - 2.0))).sqrt();
     let t_stat = beta / std_err;
-    let p_value = compute_neg_log_pvalue(t_stat, n as i32 - num_covariates as i32 - 2);
+    let neg_log_p_value = compute_neg_log_pvalue(t_stat, n as i32 - num_covariates as i32 - 2);
 
     GwasResults {
         phenotype_id,
@@ -102,7 +102,7 @@ fn single_gwas_regression(
         beta,
         std_error: std_err,
         t_stat,
-        p_value,
+        neg_log_p_value,
         sample_size: n as usize,
     }
 }
@@ -332,10 +332,10 @@ pub fn check_results(direct_results_path: &str, indirect_results_path: &str) {
             igwas.t_stat
         );
         assert!(
-            (direct.p_value - igwas.p_value).abs() < tol,
+            (direct.neg_log_p_value - igwas.neg_log_p_value).abs() < tol,
             "P - Direct: {}, Indirect: {}",
-            direct.p_value,
-            igwas.p_value
+            direct.neg_log_p_value,
+            igwas.neg_log_p_value
         );
         assert_eq!(
             direct.sample_size, igwas.sample_size,

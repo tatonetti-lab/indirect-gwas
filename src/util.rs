@@ -34,7 +34,7 @@ fn check_filter_inputs(
 ) -> Result<Vec<String>> {
     ensure!(
         projection_labels == covariance_labels,
-        "Projection and covariance matrices have different labels"
+        format!("Projection and covariance matrices have different labels. Projection labels: {:?}, covariance labels: {:?}", projection_labels, covariance_labels)
     );
 
     let mut phenotype_to_gwas_path: HashMap<String, String> = HashMap::new();

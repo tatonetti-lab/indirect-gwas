@@ -185,7 +185,7 @@ fn write_rows<W: std::io::Write>(
             "beta",
             "std_error",
             "t_stat",
-            "p_value",
+            "neg_log_p_value",
             "sample_size",
         ])?;
     }
