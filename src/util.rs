@@ -294,3 +294,25 @@ pub fn run(
 
     Ok(())
 }
+
+mod tests {
+    #[test]
+    fn test_gwas_path_to_phenotype() {
+        let paths = [
+            "plink.glm",
+            "plink.glm.linear",
+            "plink.glm.linear.zst",
+            "plink.glm.linear.gz",
+            "plink.glm.linear.zst.gz",
+        ];
+        for path in paths.iter() {
+            let result = crate::util::gwas_path_to_phenotype(path);
+            assert_eq!(result, "plink");
+        }
+
+        assert_eq!(
+            crate::util::gwas_path_to_phenotype("feature1.tsv"),
+            "feature1"
+        );
+    }
+}
