@@ -179,16 +179,18 @@ fn write_rows<W: std::io::Write>(
     add_header: bool,
     write_phenotype_id: bool,
 ) -> Result<()> {
-    if add_header && write_phenotype_id {
-        writer.write_record([
-            "phenotype_id",
-            "variant_id",
-            "beta",
-            "std_error",
-            "t_stat",
-            "neg_log_p_value",
-            "sample_size",
-        ])?;
+    if write_phenotype_id {
+        if add_header {
+            writer.write_record([
+                "phenotype_id",
+                "variant_id",
+                "beta",
+                "std_error",
+                "t_stat",
+                "neg_log_p_value",
+                "sample_size",
+            ])?;
+        }
         for i in 0..results.variant_ids.len() {
             writer.write_record(&[
                 results.projection_ids[i].clone(),
@@ -200,15 +202,17 @@ fn write_rows<W: std::io::Write>(
                 results.sample_sizes[i].to_string(),
             ])?;
         }
-    } else if add_header {
-        writer.write_record([
-            "variant_id",
-            "beta",
-            "std_error",
-            "t_stat",
-            "neg_log_p_value",
-            "sample_size",
-        ])?;
+    } else {
+        if add_header {
+            writer.write_record([
+                "variant_id",
+                "beta",
+                "std_error",
+                "t_stat",
+                "neg_log_p_value",
+                "sample_size",
+            ])?;
+        }
         for i in 0..results.variant_ids.len() {
             writer.write_record(&[
                 results.variant_ids[i].clone(),
@@ -220,7 +224,6 @@ fn write_rows<W: std::io::Write>(
             ])?;
         }
     }
-
     Ok(())
 }
 
