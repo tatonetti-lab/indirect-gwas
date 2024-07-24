@@ -68,6 +68,10 @@ pub struct InputArguments {
     /// Suppress output
     #[arg(short, long)]
     pub quiet: bool,
+
+    /// Whether to write the phenotype ID to the output file (internal use only)
+    #[clap(skip = true)]
+    pub write_phenotype_id: bool,
 }
 
 pub fn run_cli(args: InputArguments) -> Result<()> {
@@ -103,6 +107,7 @@ pub fn run_cli(args: InputArguments) -> Result<()> {
         args.num_covar,
         runtime_config,
         column_names,
+        args.write_phenotype_id,
     )?;
 
     let duration = Duration::new(start.elapsed().as_secs(), 0);

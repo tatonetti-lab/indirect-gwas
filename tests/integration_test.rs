@@ -98,6 +98,7 @@ fn run_fn() {
             se: args.std_error,
             sample_size: args.sample_size,
         },
+        true,
     );
 
     if let Err(e) = result {
@@ -136,6 +137,7 @@ fn run_fn_compressed() {
             se: args.std_error,
             sample_size: args.sample_size,
         },
+        true,
     );
 
     if let Err(e) = result {

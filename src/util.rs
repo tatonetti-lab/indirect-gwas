@@ -146,6 +146,7 @@ struct LineSpec {
 fn process_chunk(
     gwas_result_files: Vec<String>,
     column_names: io::gwas::ColumnSpec,
+    write_phenotype_id: bool,
     lines: LineSpec,
     output_file: &str,
     runtime_config: &RuntimeConfig,
@@ -217,6 +218,7 @@ fn process_chunk(
         final_stats,
         output_file,
         include_header,
+        write_phenotype_id,
         runtime_config.compress,
     )
     .with_context(|| format!("Error writing GWAS results to file: {}", output_file))?;
@@ -232,6 +234,7 @@ pub fn run(
     num_covar: usize,
     runtime_config: RuntimeConfig,
     column_names: io::gwas::ColumnSpec,
+    write_phenotype_id: bool,
 ) -> Result<()> {
     let projection_matrix =
         io::matrix::read_labeled_matrix(projection_matrix_path).with_context(|| {
@@ -279,6 +282,7 @@ pub fn run(
         process_chunk(
             gwas_result_files.clone(),
             column_names.clone(),
+            write_phenotype_id,
             LineSpec {
                 start_line,
                 end_line,

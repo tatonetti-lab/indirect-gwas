@@ -177,10 +177,20 @@ fn write_rows<W: std::io::Write>(
     writer: &mut csv::Writer<W>,
     results: &IGwasResults,
     add_header: bool,
+    write_phenotype_id: bool,
 ) -> Result<()> {
-    if add_header {
+    if add_header && write_phenotype_id {
         writer.write_record([
             "phenotype_id",
+            "variant_id",
+            "beta",
+            "std_error",
+            "t_stat",
+            "neg_log_p_value",
+            "sample_size",
+        ])?;
+    } else if add_header {
+        writer.write_record([
             "variant_id",
             "beta",
             "std_error",
@@ -209,6 +219,7 @@ pub fn write_gwas_results(
     results: IGwasResults,
     filename: &str,
     add_header: bool,
+    write_phenotype_id: bool,
     compress: bool,
 ) -> Result<()> {
     let file = if add_header {
@@ -227,13 +238,13 @@ pub fn write_gwas_results(
             .delimiter(b'\t')
             .buffer_capacity(8 * (1 << 13))
             .from_writer(zstd_writer);
-        write_rows(&mut writer, &results, add_header)?;
+        write_rows(&mut writer, &results, add_header, write_phenotype_id)?;
     } else {
         let mut writer = csv::WriterBuilder::new()
             .delimiter(b'\t')
             .buffer_capacity(8 * (1 << 13))
             .from_writer(file);
-        write_rows(&mut writer, &results, add_header)?;
+        write_rows(&mut writer, &results, add_header, write_phenotype_id)?;
     };
 
     Ok(())

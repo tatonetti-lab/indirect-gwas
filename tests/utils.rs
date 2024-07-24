@@ -290,6 +290,7 @@ pub fn setup_test(
         capacity: 10,
         compress: false,
         quiet: true,
+        write_phenotype_id: true,
     }
 }
 
