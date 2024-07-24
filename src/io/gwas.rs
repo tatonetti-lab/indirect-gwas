@@ -189,6 +189,17 @@ fn write_rows<W: std::io::Write>(
             "neg_log_p_value",
             "sample_size",
         ])?;
+        for i in 0..results.variant_ids.len() {
+            writer.write_record(&[
+                results.projection_ids[i].clone(),
+                results.variant_ids[i].clone(),
+                results.beta_values[i].to_string(),
+                results.se_values[i].to_string(),
+                results.t_stat_values[i].to_string(),
+                results.p_values[i].to_string(),
+                results.sample_sizes[i].to_string(),
+            ])?;
+        }
     } else if add_header {
         writer.write_record([
             "variant_id",
@@ -198,18 +209,16 @@ fn write_rows<W: std::io::Write>(
             "neg_log_p_value",
             "sample_size",
         ])?;
-    }
-
-    for i in 0..results.variant_ids.len() {
-        writer.write_record(&[
-            results.projection_ids[i].clone(),
-            results.variant_ids[i].clone(),
-            results.beta_values[i].to_string(),
-            results.se_values[i].to_string(),
-            results.t_stat_values[i].to_string(),
-            results.p_values[i].to_string(),
-            results.sample_sizes[i].to_string(),
-        ])?;
+        for i in 0..results.variant_ids.len() {
+            writer.write_record(&[
+                results.variant_ids[i].clone(),
+                results.beta_values[i].to_string(),
+                results.se_values[i].to_string(),
+                results.t_stat_values[i].to_string(),
+                results.p_values[i].to_string(),
+                results.sample_sizes[i].to_string(),
+            ])?;
+        }
     }
 
     Ok(())
