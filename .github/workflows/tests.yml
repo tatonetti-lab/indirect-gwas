@@ -16,3 +16,17 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
+  test-python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+    - uses: actions/checkout@v4
+    - run: curl -LsSf https://astral.sh/uv/install.sh | sh
+    - run: source $HOME/.cargo/env
+    - run: uv venv --python ${{ matrix.python-version }}
+    - run: uv pip install ruff pytest
+    - run: uv sync
+    - run: uv run ruff check
+    - run: uv run pytest -v

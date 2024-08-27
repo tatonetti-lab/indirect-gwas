@@ -308,6 +308,7 @@ mod tests {
             "plink.glm.linear.zst",
             "plink.glm.linear.gz",
             "plink.glm.linear.zst.gz",
+            "here/is/a/path/plink.glm.linear.zst.gz",
         ];
         for path in paths.iter() {
             let result = crate::util::gwas_path_to_phenotype(path);
