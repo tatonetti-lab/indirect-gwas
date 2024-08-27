@@ -1,5 +1,6 @@
 # Indirect GWAS
 
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Test package](https://github.com/tatonetti-lab/indirect-gwas/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/tatonetti-lab/indirect-gwas/actions)
 
 Indirect GWAS is a Rust program for computing genome-wide association study results indirectly.
