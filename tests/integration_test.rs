@@ -158,7 +158,7 @@ fn test_run_cli() {
     let path = dir.path();
     let args = utils::setup_test(path, 100, 1000, 10, 100, 10, false);
 
-    let result = igwas::run_cli(args);
+    let result = igwas::cli::run_cli(args);
 
     if let Err(e) = result {
         panic!("Error running IGWAS: {}", e);
@@ -178,7 +178,7 @@ fn test_run_cli_compressed() {
     let path = dir.path();
     let args = utils::setup_test(path, 100, 1000, 10, 100, 10, true);
 
-    let result = igwas::run_cli(args);
+    let result = igwas::cli::run_cli(args);
 
     if let Err(e) = result {
         panic!("Error running IGWAS: {}", e);

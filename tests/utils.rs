@@ -5,7 +5,7 @@ use nalgebra::{DMatrix, DVector};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use igwas::{stats::sumstats::compute_neg_log_pvalue, InputArguments};
+use igwas::{cli::InputArguments, stats::sumstats::compute_neg_log_pvalue};
 
 pub struct TestData {
     pub variant_ids: Vec<String>,
