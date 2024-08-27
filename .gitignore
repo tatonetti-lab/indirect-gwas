@@ -1,1 +1,3 @@
 target
+dist
+python/igwas/__pycache__
