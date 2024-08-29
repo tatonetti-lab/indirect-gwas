@@ -21,6 +21,7 @@ def igwas_files(
     capacity: int = 25,
     compress: bool = False,
     quiet: bool = False,
+    write_phenotype_id: bool = False,
 ) -> None:
     """Run Indirect GWAS
 
@@ -62,6 +63,7 @@ def igwas_files(
         capacity,
         compress,
         quiet,
+        write_phenotype_id,
     )
 
 

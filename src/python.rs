@@ -22,6 +22,7 @@ fn igwas_impl(
     capacity: usize,
     compress: bool,
     quiet: bool,
+    write_phenotype_id: bool,
 ) -> PyResult<()> {
     let args = crate::cli::InputArguments {
         projection_matrix,
@@ -38,7 +39,7 @@ fn igwas_impl(
         capacity,
         compress,
         quiet,
-        write_phenotype_id: false,
+        write_phenotype_id,
     };
     match crate::cli::run_cli(args) {
         Ok(_) => Ok(()),
